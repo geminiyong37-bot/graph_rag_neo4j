@@ -122,7 +122,7 @@ python 3_ask_graph.py
 
 ## Neo4j에서 확인하기
 
-Neo4j Browser 또는 Bloom에서 다음 Cypher로 생성된 그래프를 확인할 수 있습니다.
+Neo4j Desktop에서 다음 Cypher로 생성된 그래프를 확인할 수 있습니다.
 
 ```cypher
 MATCH (n)-[r]->(m)
