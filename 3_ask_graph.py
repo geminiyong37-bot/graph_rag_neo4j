@@ -1,5 +1,12 @@
 import os
+import sys
 from dotenv import load_dotenv
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_neo4j import Neo4jGraph
@@ -95,14 +102,26 @@ def hybrid_search_and_answer(question: str, top_k: int = 3) -> str:
     return response.content
 
 if __name__ == "__main__":
-    # 테스트 질문 목록
-    test_questions = [
-        "사학기관 재무회계 규칙에서 이월금 처리는 어떻게 해야 해?",
-        "예산 편성 시 주의해야 할 기본 원칙은 뭐야?"
-    ]
+    print("=" * 60)
+    print("💬 사학기관 재무회계 지식 그래프 AI 챗봇이 준비되었습니다!")
+    print("종료하려면 'exit' 또는 'q'를 입력하세요.")
+    print("=" * 60)
 
-    for q in test_questions:
-        answer = hybrid_search_and_answer(q)
-        print("💬 [AI 답변]:")
-        print(answer)
-        print("\n" + "="*60)
+    while True:
+        try:
+            user_input = input("\n[질문 입력]: ").strip()
+            if not user_input:
+                continue
+            if user_input.lower() in ["exit", "q", "quit", "종료"]:
+                print("👋 챗봇을 종료합니다. 수고하셨습니다!")
+                break
+            
+            answer = hybrid_search_and_answer(user_input)
+            print("\n💬 [AI 답변]:")
+            print(answer)
+            print("-" * 60)
+        except KeyboardInterrupt:
+            print("\n👋 챗봇을 종료합니다.")
+            break
+        except Exception as err:
+            print(f"❌ 오류 발생: {err}")
