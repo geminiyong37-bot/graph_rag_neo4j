@@ -10,6 +10,13 @@ if sys.platform == "win32":
 
 from neo4j import GraphDatabase
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+try:
+    from flashrank import Ranker, RerankRequest
+    ranker = Ranker()
+    HAS_RERANKER = True
+except Exception as e:
+    print(f"[WARN] FlashRank 초기화 실패 (기본 검색으로 동작): {e}")
+    HAS_RERANKER = False
 
 load_dotenv()
 
@@ -34,14 +41,15 @@ def run_query(cypher: str, params: dict = None):
 
 def hybrid_search_and_answer(question: str, top_k: int = 3) -> str:
     print(f"\n❓ 질문: {question}", flush=True)
-    print("🔍 [1단계: 벡터 검색] 질문과 유사한 원문 Chunk 탐색 중...", flush=True)
+    print("🔍 [1단계: Neo4j 벡터 & 지식 그래프 검색] 후보 문단 10개 추출 중...", flush=True)
 
     # 1. 질문을 임베딩 벡터로 변환
     query_embedding = embeddings.embed_query(question)
 
-    # 2. Neo4j 벡터 인덱스 검색 + 연결된 지식 그래프 조인 (Hybrid Query)
+    # 2. Neo4j 벡터 인덱스 검색 + 연결된 지식 그래프 조인 (후보 10개 추출)
+    initial_k = max(top_k * 3, 10)
     cypher_query = """
-    CALL db.index.vector.queryNodes('chunk_vector_index', $top_k, $query_embedding)
+    CALL db.index.vector.queryNodes('chunk_vector_index', $initial_k, $query_embedding)
     YIELD node AS chunk, score
     OPTIONAL MATCH (chunk)-[:MENTIONS]->(e:Entity)
     OPTIONAL MATCH (e)-[r]->(target:Entity)
@@ -50,13 +58,30 @@ def hybrid_search_and_answer(question: str, top_k: int = 3) -> str:
            collect(DISTINCT e.id + ' -[' + type(r) + ']-> ' + target.id) AS relationships
     """
 
-    results = run_query(cypher_query, {"top_k": top_k, "query_embedding": query_embedding})
+    results = run_query(cypher_query, {"initial_k": initial_k, "query_embedding": query_embedding})
 
     if not results:
         print("❌ 관련된 데이터를 찾지 못했어.", flush=True)
         return "관련 데이터를 찾을 수 없습니다."
 
-    print(f"✅ 상위 {len(results)}개 관련 문단 및 연관 지식 그래프 추출 완료!", flush=True)
+    print(f"✅ Neo4j에서 후보 문단 {len(results)}개 및 연관 지식 그래프 추출 완료!", flush=True)
+
+    # 3. 2차 정밀 재정렬 (FlashRank Reranking)
+    if HAS_RERANKER and len(results) > 1:
+        print("🎯 [2단계: FlashRank Reranker] 후보 문단 정밀 재정렬 중...", flush=True)
+        passages = [{"id": idx, "text": r["text"]} for idx, r in enumerate(results)]
+        rerank_request = RerankRequest(query=question, passages=passages)
+        rerank_results = ranker.rerank(rerank_request)
+
+        # Rerank 점수 기준으로 results 재정렬
+        id_to_score = {item["id"]: item.get("score", 0) for item in rerank_results}
+        for idx, r in enumerate(results):
+            r["rerank_score"] = id_to_score.get(idx, 0)
+
+        results = sorted(results, key=lambda x: x.get("rerank_score", 0), reverse=True)[:top_k]
+        print(f"🏆 Rerank 정밀 심사 완료! 상위 {len(results)}개 최고 적합 문단 최종 선정!", flush=True)
+    else:
+        results = results[:top_k]
 
     # 3. 프롬프트 문맥(Context) 구성
     context_blocks = []
