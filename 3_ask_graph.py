@@ -8,8 +8,8 @@ if sys.platform == "win32":
     except Exception:
         pass
 
+from neo4j import GraphDatabase
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_neo4j import Neo4jGraph
 
 load_dotenv()
 
@@ -18,23 +18,19 @@ NEO4J_USERNAME = os.getenv("NEO4J_USERNAME")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
-# 1. Neo4j 및 LLM / Embeddings 초기화
-# AuraDB Free 플랜은 database 파라미터를 지정하면 DatabaseNotFound 오류 발생함.
-# langchain_neo4j의 Neo4jGraph는 기본값으로 database="neo4j"를 사용하므로
-# database=None 을 명시적으로 전달하여 기본값을 완전히 차단.
-graph = Neo4jGraph(
-    url=NEO4J_URI,
-    username=NEO4J_USERNAME,
-    password=NEO4J_PASSWORD,
-    database=None,
-)
+# 1. 순수 neo4j 드라이버로 연결 (AuraDB 완전 호환, langchain_neo4j 라우팅 충돌 없음)
+driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USERNAME, NEO4J_PASSWORD))
 
-llm = ChatOpenAI(
-    model=OPENAI_MODEL,
-    temperature=0,
-)
-
+llm = ChatOpenAI(model=OPENAI_MODEL, temperature=0)
 embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+
+
+def run_query(cypher: str, params: dict = None):
+    """순수 neo4j 드라이버로 Cypher 쿼리 실행"""
+    with driver.session() as session:
+        result = session.run(cypher, params or {})
+        return [record.data() for record in result]
+
 
 def hybrid_search_and_answer(question: str, top_k: int = 3) -> str:
     print(f"\n❓ 질문: {question}", flush=True)
@@ -54,7 +50,7 @@ def hybrid_search_and_answer(question: str, top_k: int = 3) -> str:
            collect(DISTINCT e.id + ' -[' + type(r) + ']-> ' + target.id) AS relationships
     """
 
-    results = graph.query(cypher_query, params={"top_k": top_k, "query_embedding": query_embedding})
+    results = run_query(cypher_query, {"top_k": top_k, "query_embedding": query_embedding})
 
     if not results:
         print("❌ 관련된 데이터를 찾지 못했어.", flush=True)
@@ -118,7 +114,7 @@ if __name__ == "__main__":
             if user_input.lower() in ["exit", "q", "quit", "종료"]:
                 print("👋 챗봇을 종료합니다. 수고하셨습니다!")
                 break
-            
+
             answer = hybrid_search_and_answer(user_input)
             print("\n💬 [AI 답변]:")
             print(answer)
