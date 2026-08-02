@@ -50,10 +50,7 @@ llm = ChatOpenAI(
     temperature=0,
 )
 
-structured_llm = llm.with_structured_output(
-    KGGraph,
-    method="json_schema",
-)
+structured_llm = llm.with_structured_output(KGGraph)
 
 text = """
 김민수는 결제 시스템 리팩터링을 담당했다.

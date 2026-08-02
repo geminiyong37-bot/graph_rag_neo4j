@@ -2,6 +2,8 @@
 .env.*
 !.env_example
 
+progress_checkpoint.json
+
 .venv/
 venv/
 env/
