@@ -19,12 +19,15 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 # 1. Neo4j 및 LLM / Embeddings 초기화
-graph = Neo4jGraph(
-    url=NEO4J_URI,
-    username=NEO4J_USERNAME,
-    password=NEO4J_PASSWORD,
-    database=os.getenv("NEO4J_DATABASE"),
-)
+graph_kwargs = {
+    "url": NEO4J_URI,
+    "username": NEO4J_USERNAME,
+    "password": NEO4J_PASSWORD,
+}
+if os.getenv("NEO4J_DATABASE"):
+    graph_kwargs["database"] = os.getenv("NEO4J_DATABASE")
+
+graph = Neo4jGraph(**graph_kwargs)
 
 llm = ChatOpenAI(
     model=OPENAI_MODEL,
@@ -54,7 +57,7 @@ def hybrid_search_and_answer(question: str, top_k: int = 3) -> str:
     results = graph.query(cypher_query, params={"top_k": top_k, "query_embedding": query_embedding})
 
     if not results:
-        print("❌ 관련된 데이터를 찾지 못했어.")
+        print("❌ 관련된 데이터를 찾지 못했어.", flush=True)
         return "관련 데이터를 찾을 수 없습니다."
 
     print(f"✅ 상위 {len(results)}개 관련 문단 및 연관 지식 그래프 추출 완료!", flush=True)
