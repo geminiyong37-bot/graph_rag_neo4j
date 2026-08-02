@@ -19,13 +19,17 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 # 1. Neo4j 및 LLM / Embeddings 초기화
+# AuraDB Free 인스턴스는 database='neo4j' 파라미터가 들어갈 경우 DatabaseNotFound 오류 발생함.
+# 따라서 'neo4j' 인 경우 파라미터 제외 처리
 graph_kwargs = {
     "url": NEO4J_URI,
     "username": NEO4J_USERNAME,
     "password": NEO4J_PASSWORD,
 }
-if os.getenv("NEO4J_DATABASE"):
-    graph_kwargs["database"] = os.getenv("NEO4J_DATABASE")
+
+db_name = os.getenv("NEO4J_DATABASE")
+if db_name and db_name.strip() not in ["", "neo4j", "None"]:
+    graph_kwargs["database"] = db_name.strip()
 
 graph = Neo4jGraph(**graph_kwargs)
 
