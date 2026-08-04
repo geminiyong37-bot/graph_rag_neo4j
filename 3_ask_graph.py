@@ -53,7 +53,7 @@ def hybrid_search_and_answer(question: str, top_k: int = 3) -> str:
     YIELD node AS chunk, score
     OPTIONAL MATCH (chunk)-[:MENTIONS]->(e:Entity)
     OPTIONAL MATCH (e)-[r]->(target:Entity)
-    RETURN chunk.text AS text, score,
+    RETURN chunk.text AS text, coalesce(chunk.file_name, '출처 미상') AS file_name, score,
            collect(DISTINCT e.id + ' (' + e.type + ')') AS entities,
            collect(DISTINCT e.id + ' -[' + type(r) + ']-> ' + target.id) AS relationships
     """
@@ -87,10 +87,11 @@ def hybrid_search_and_answer(question: str, top_k: int = 3) -> str:
     context_blocks = []
     for idx, row in enumerate(results, 1):
         chunk_text = row.get("text", "")
+        file_name = row.get("file_name", "출처 미상")
         entities = ", ".join(row.get("entities", [])) or "없음"
         relationships = ", ".join(row.get("relationships", [])) or "없음"
 
-        block = f"""[참고 문단 {idx} (유사도: {row.get('score', 0):.4f})]
+        block = f"""[참고 문단 {idx} (출처 파일: {file_name} / 유사도: {row.get('score', 0):.4f})]
 원문 내용:
 {chunk_text}
 

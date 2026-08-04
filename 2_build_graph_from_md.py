@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import uuid
 from typing import Literal
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -91,6 +92,100 @@ OPTIONS { indexConfig: {
 }}
 """)
 
+def ingest_chunk_text(chunk_text: str, source_name: str = "온라인상담_구글시트", custom_chunk_id: str = None) -> dict:
+    if not custom_chunk_id:
+        custom_chunk_id = f"chunk_sheet_{uuid.uuid4().hex[:10]}"
+
+    # 1) 원문 Chunk 임베딩 벡터 생성
+    chunk_embedding = embeddings.embed_query(chunk_text)
+
+    # 2) Neo4j에 Chunk 노드 및 임베딩 저장
+    graph.query(
+        """
+        MERGE (c:Chunk {id: $id})
+        SET c.text = $text,
+            c.embedding = $embedding,
+            c.file_name = $file_name
+        """,
+        params={
+            "id": custom_chunk_id,
+            "text": chunk_text,
+            "embedding": chunk_embedding,
+            "file_name": source_name
+        }
+    )
+
+    # 3) LLM 지식 그래프 추출
+    prompt = f"""
+다음 법률/회계 규칙 또는 Q&A 문서 텍스트에서 주요 개체(노드)와 관계를 추출하세요.
+
+규칙:
+- 텍스트에 포함된 내용만 추출하세요.
+- 중요한 조항, 규칙, 기관, 계정과목, 개체, 지침 등을 노드로 추출하세요.
+- relationship의 source와 target은 반드시 nodes의 id 중 하나여야 합니다.
+
+텍스트:
+{chunk_text}
+"""
+    nodes_created = 0
+    rels_created = 0
+
+    try:
+        kg = structured_llm.invoke(prompt)
+        if kg.nodes:
+            nodes = [node.model_dump() for node in kg.nodes]
+            relationships = [rel.model_dump() for rel in kg.relationships]
+            nodes_created = len(nodes)
+            rels_created = len(relationships)
+
+            graph.query(
+                """
+                UNWIND $nodes AS node
+                MERGE (e:Entity {id: node.id})
+                SET e.type = node.type
+                """,
+                params={"nodes": nodes},
+            )
+
+            for node in kg.nodes:
+                graph.query(
+                    f"""
+                    MATCH (e:Entity {{id: $id}})
+                    SET e:{node.type}
+                    """,
+                    params={"id": node.id},
+                )
+
+            for rel in relationships:
+                kind = "".join(c for c in rel["kind"].upper() if c.isalnum() or c == "_") or "RELATED_TO"
+                graph.query(
+                    f"""
+                    MATCH (source:Entity {{id: $source}})
+                    MATCH (target:Entity {{id: $target}})
+                    MERGE (source)-[r:{kind}]->(target)
+                    """,
+                    params={"source": rel["source"], "target": rel["target"]},
+                )
+
+            entity_ids = [node.id for node in kg.nodes]
+            graph.query(
+                """
+                MATCH (c:Chunk {id: $chunk_id})
+                UNWIND $entity_ids AS e_id
+                MATCH (e:Entity {id: e_id})
+                MERGE (c)-[:MENTIONS]->(e)
+                """,
+                params={"chunk_id": custom_chunk_id, "entity_ids": entity_ids}
+            )
+    except Exception as e:
+        print(f"[WARN] LLM 추출 실패 (Chunk 노드는 저장됨): {e}")
+
+    return {
+        "chunk_id": custom_chunk_id,
+        "nodes_created": nodes_created,
+        "relationships_created": rels_created
+    }
+
 def process_md_file(file_path: str):
     if not os.path.exists(file_path):
         print(f"[ERROR] 파일을 찾을 수 없어: {file_path}")
@@ -129,17 +224,19 @@ def process_md_file(file_path: str):
             print(f"  [WARN] 임베딩 생성 오류 (건너뜀): {embed_err}", flush=True)
             continue
 
-        # 2) Neo4j에 Chunk 노드 및 임베딩 저장
+        # 2) Neo4j에 Chunk 노드 및 임베딩 저장 (파일명 메타데이터 추가)
         graph.query(
             """
             MERGE (c:Chunk {id: $id})
             SET c.text = $text,
-                c.embedding = $embedding
+                c.embedding = $embedding,
+                c.file_name = $file_name
             """,
             params={
                 "id": chunk_id,
                 "text": chunk,
-                "embedding": chunk_embedding
+                "embedding": chunk_embedding,
+                "file_name": os.path.basename(file_path)
             }
         )
 
