@@ -17,11 +17,6 @@ from langchain_neo4j import Neo4jGraph
 
 load_dotenv()
 
-NEO4J_URI = os.getenv("NEO4J_URI")
-NEO4J_USERNAME = os.getenv("NEO4J_USERNAME")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-
 # 1. Pydantic 추출 스키마 정의
 class KGNode(BaseModel):
     id: str = Field(description="노드 이름/핵심 개체명 (예: 사학기관, 재무회계규칙, 이사회, 예산 등)")
@@ -35,6 +30,64 @@ class KGRelationship(BaseModel):
 class KGGraph(BaseModel):
     nodes: list[KGNode]
     relationships: list[KGRelationship]
+
+# Lazy Global Objects
+_graph = None
+_llm = None
+_embeddings = None
+_structured_llm = None
+_schema_initialized = False
+
+def get_graph():
+    global _graph
+    if _graph is None:
+        neo4j_uri = os.getenv("NEO4J_URI")
+        neo4j_user = os.getenv("NEO4J_USERNAME")
+        neo4j_pass = os.getenv("NEO4J_PASSWORD")
+        neo4j_db = os.getenv("NEO4J_DATABASE")
+        _graph = Neo4jGraph(
+            url=neo4j_uri,
+            username=neo4j_user,
+            password=neo4j_pass,
+            database=neo4j_db,
+        )
+    return _graph
+
+def get_models():
+    global _llm, _embeddings, _structured_llm
+    if _llm is None:
+        model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        _llm = ChatOpenAI(model=model_name, temperature=0)
+        _embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+        _structured_llm = _llm.with_structured_output(KGGraph)
+    return _llm, _embeddings, _structured_llm
+
+def ensure_schema():
+    global _schema_initialized
+    if not _schema_initialized:
+        g = get_graph()
+        try:
+            g.query("""
+            CREATE CONSTRAINT entity_id_unique IF NOT EXISTS
+            FOR (e:Entity)
+            REQUIRE e.id IS UNIQUE
+            """)
+            g.query("""
+            CREATE CONSTRAINT chunk_id_unique IF NOT EXISTS
+            FOR (c:Chunk)
+            REQUIRE c.id IS UNIQUE
+            """)
+            g.query("""
+            CREATE VECTOR INDEX chunk_vector_index IF NOT EXISTS
+            FOR (c:Chunk) ON (c.embedding)
+            OPTIONS { indexConfig: {
+              `vector.dimensions`: 1536,
+              `vector.similarity_function`: 'cosine'
+            }}
+            """)
+            _schema_initialized = True
+        except Exception as e:
+            print(f"[WARN] Schema initialization warning: {e}", flush=True)
 
 # 2. 순수 파이썬 초고속 문단 분할 함수 (청크 사이즈: 400자, 오버랩: 50자)
 def split_text_into_chunks(text: str, chunk_size: int = 400, chunk_overlap: int = 50) -> list[str]:
@@ -53,54 +106,19 @@ def split_text_into_chunks(text: str, chunk_size: int = 400, chunk_overlap: int 
         start = end - chunk_overlap if end < text_len else text_len
     return chunks
 
-# 3. Neo4j 및 LLM / Embedding 초기화
-graph = Neo4jGraph(
-    url=NEO4J_URI,
-    username=NEO4J_USERNAME,
-    password=NEO4J_PASSWORD,
-    database=os.getenv("NEO4J_DATABASE"),
-)
-
-llm = ChatOpenAI(
-    model=OPENAI_MODEL,
-    temperature=0,
-)
-
-embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-
-structured_llm = llm.with_structured_output(KGGraph)
-
-# 4. 제약 조건 및 벡터 인덱스 생성
-graph.query("""
-CREATE CONSTRAINT entity_id_unique IF NOT EXISTS
-FOR (e:Entity)
-REQUIRE e.id IS UNIQUE
-""")
-
-graph.query("""
-CREATE CONSTRAINT chunk_id_unique IF NOT EXISTS
-FOR (c:Chunk)
-REQUIRE c.id IS UNIQUE
-""")
-
-graph.query("""
-CREATE VECTOR INDEX chunk_vector_index IF NOT EXISTS
-FOR (c:Chunk) ON (c.embedding)
-OPTIONS { indexConfig: {
-  `vector.dimensions`: 1536,
-  `vector.similarity_function`: 'cosine'
-}}
-""")
-
 def ingest_chunk_text(chunk_text: str, source_name: str = "온라인상담_구글시트", custom_chunk_id: str = None) -> dict:
     if not custom_chunk_id:
         custom_chunk_id = f"chunk_sheet_{uuid.uuid4().hex[:10]}"
+
+    g = get_graph()
+    _, embeddings, structured_llm = get_models()
+    ensure_schema()
 
     # 1) 원문 Chunk 임베딩 벡터 생성
     chunk_embedding = embeddings.embed_query(chunk_text)
 
     # 2) Neo4j에 Chunk 노드 및 임베딩 저장
-    graph.query(
+    g.query(
         """
         MERGE (c:Chunk {id: $id})
         SET c.text = $text,
@@ -138,7 +156,7 @@ def ingest_chunk_text(chunk_text: str, source_name: str = "온라인상담_구�
             nodes_created = len(nodes)
             rels_created = len(relationships)
 
-            graph.query(
+            g.query(
                 """
                 UNWIND $nodes AS node
                 MERGE (e:Entity {id: node.id})
@@ -148,7 +166,7 @@ def ingest_chunk_text(chunk_text: str, source_name: str = "온라인상담_구�
             )
 
             for node in kg.nodes:
-                graph.query(
+                g.query(
                     f"""
                     MATCH (e:Entity {{id: $id}})
                     SET e:{node.type}
@@ -158,7 +176,7 @@ def ingest_chunk_text(chunk_text: str, source_name: str = "온라인상담_구�
 
             for rel in relationships:
                 kind = "".join(c for c in rel["kind"].upper() if c.isalnum() or c == "_") or "RELATED_TO"
-                graph.query(
+                g.query(
                     f"""
                     MATCH (source:Entity {{id: $source}})
                     MATCH (target:Entity {{id: $target}})
@@ -168,7 +186,7 @@ def ingest_chunk_text(chunk_text: str, source_name: str = "온라인상담_구�
                 )
 
             entity_ids = [node.id for node in kg.nodes]
-            graph.query(
+            g.query(
                 """
                 MATCH (c:Chunk {id: $chunk_id})
                 UNWIND $entity_ids AS e_id
@@ -190,6 +208,10 @@ def process_md_file(file_path: str):
     if not os.path.exists(file_path):
         print(f"[ERROR] 파일을 찾을 수 없어: {file_path}")
         return
+
+    g = get_graph()
+    _, embeddings, structured_llm = get_models()
+    ensure_schema()
 
     print(f"[READ] '{file_path}' 파일 읽는 중...", flush=True)
     with open(file_path, "r", encoding="utf-8") as f:
@@ -225,7 +247,7 @@ def process_md_file(file_path: str):
             continue
 
         # 2) Neo4j에 Chunk 노드 및 임베딩 저장 (파일명 메타데이터 추가)
-        graph.query(
+        g.query(
             """
             MERGE (c:Chunk {id: $id})
             SET c.text = $text,
@@ -259,7 +281,7 @@ def process_md_file(file_path: str):
                 relationships = [rel.model_dump() for rel in kg.relationships]
 
                 # Entity 노드 저장
-                graph.query(
+                g.query(
                     """
                     UNWIND $nodes AS node
                     MERGE (e:Entity {id: node.id})
@@ -269,7 +291,7 @@ def process_md_file(file_path: str):
                 )
 
                 for node in kg.nodes:
-                    graph.query(
+                    g.query(
                         f"""
                         MATCH (e:Entity {{id: $id}})
                         SET e:{node.type}
@@ -280,7 +302,7 @@ def process_md_file(file_path: str):
                 # Relationship 저장
                 for rel in relationships:
                     kind = "".join(c for c in rel["kind"].upper() if c.isalnum() or c == "_") or "RELATED_TO"
-                    graph.query(
+                    g.query(
                         f"""
                         MATCH (source:Entity {{id: $source}})
                         MATCH (target:Entity {{id: $target}})
@@ -291,7 +313,7 @@ def process_md_file(file_path: str):
 
                 # 4) Chunk 노드 -> Entity 노드간 (:MENTIONS) 관계 연결
                 entity_ids = [node.id for node in kg.nodes]
-                graph.query(
+                g.query(
                     """
                     MATCH (c:Chunk {id: $chunk_id})
                     UNWIND $entity_ids AS e_id
