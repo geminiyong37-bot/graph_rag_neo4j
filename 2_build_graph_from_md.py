@@ -17,15 +17,15 @@ from langchain_neo4j import Neo4jGraph
 
 load_dotenv()
 
-# 1. Pydantic 추출 스키마 정의
+# 1. 사학회계/대학Q&A 특화 정밀 Pydantic 스키마 정의
 class KGNode(BaseModel):
-    id: str = Field(description="노드 이름/핵심 개체명 (예: 사학기관, 재무회계규칙, 이사회, 예산 등)")
-    type: Literal["Organization", "Regulation", "Account", "Person", "Concept", "System", "Unknown"]
+    id: str = Field(description="노드 이름/핵심 개체명 (예: 사학기관, 교비회계, 이사회, 제14조, 수입조정, 예비비 등)")
+    type: Literal["Organization", "Regulation", "Account", "Procedure", "Exception", "Concept", "Person", "System", "Unknown"]
 
 class KGRelationship(BaseModel):
     source: str = Field(description="출발 노드 id")
     target: str = Field(description="도착 노드 id")
-    kind: str = Field(description="관계 종류 (예: APPLIES_TO, GOVERNS, INCLUDES, RESPONSIBLE_FOR, RELATED_TO 등)")
+    kind: str = Field(description="관계 종류 (예: GOVERNS, APPLIES_TO, INCLUDES, EXCEPT_FOR, REQUIRES_PROCEDURE, RELATED_TO 등)")
 
 class KGGraph(BaseModel):
     nodes: list[KGNode]
@@ -133,13 +133,29 @@ def ingest_chunk_text(chunk_text: str, source_name: str = "온라인상담_구�
         }
     )
 
-    # 3) LLM 지식 그래프 추출
+    # 3) LLM 고도화 지식 그래프 추출
     prompt = f"""
-다음 법률/회계 규칙 또는 Q&A 문서 텍스트에서 주요 개체(노드)와 관계를 추출하세요.
+다음 사학기관 재무·회계 규칙, 법령 또는 대학 Q&A 텍스트에서 주요 개체(노드)와 개체 간의 구조적 연관 관계를 추출하세요.
+
+[추출 대상 노드 유형 (type)]:
+- Organization: 대학, 사학법인, 이사회, 교육부, 주무관청 등
+- Regulation: 재무·회계 규칙, 사립학교법, 정관, 세부 지침, 관련 조항 (예: 제14조, 제21조)
+- Account: 수입/지출 계정과목, 예산/결산 항목 (예: 등록금수입, 교비회계, 법인회계, 예비비 등)
+- Procedure: 결재, 편성, 집행, 변경, 이월, 승인 절차 (예: 이사회 의결, 주무관청 보고)
+- Exception: 예외 규정, 금지 사항, 단서 조항
+- Concept: 핵심 개념 및 회계/행정 용어
+- Person: 이사장, 총장, 회계책임자 등
+
+[추출 대상 관계 종류 (kind)]:
+- GOVERNS (관할/규정함)
+- APPLIES_TO (적용됨)
+- INCLUDES (포함함/상위계정)
+- EXCEPT_FOR (예외사항)
+- REQUIRES_PROCEDURE (절차필요)
+- RELATED_TO (연관됨)
 
 규칙:
-- 텍스트에 포함된 내용만 추출하세요.
-- 중요한 조항, 규칙, 기관, 계정과목, 개체, 지침 등을 노드로 추출하세요.
+- 텍스트에 실질적으로 명시되거나 추론 가능한 명확한 관계만 추출하세요.
 - relationship의 source와 target은 반드시 nodes의 id 중 하나여야 합니다.
 
 텍스트:
@@ -264,11 +280,27 @@ def process_md_file(file_path: str):
 
         # 3) LLM 지식 그래프 추출
         prompt = f"""
-다음 법률/회계 규칙 문서 텍스트에서 주요 개체(노드)와 관계를 추출하세요.
+다음 사학기관 재무·회계 규칙, 법령 또는 대학 Q&A 텍스트에서 주요 개체(노드)와 개체 간의 구조적 연관 관계를 추출하세요.
+
+[추출 대상 노드 유형 (type)]:
+- Organization: 대학, 사학법인, 이사회, 교육부, 주무관청 등
+- Regulation: 재무·회계 규칙, 사립학교법, 정관, 세부 지침, 관련 조항 (예: 제14조, 제21조)
+- Account: 수입/지출 계정과목, 예산/결산 항목 (예: 등록금수입, 교비회계, 법인회계, 예비비 등)
+- Procedure: 결재, 편성, 집행, 변경, 이월, 승인 절차 (예: 이사회 의결, 주무관청 보고)
+- Exception: 예외 규정, 금지 사항, 단서 조항
+- Concept: 핵심 개념 및 회계/행정 용어
+- Person: 이사장, 총장, 회계책임자 등
+
+[추출 대상 관계 종류 (kind)]:
+- GOVERNS (관할/규정함)
+- APPLIES_TO (적용됨)
+- INCLUDES (포함함/상위계정)
+- EXCEPT_FOR (예외사항)
+- REQUIRES_PROCEDURE (절차필요)
+- RELATED_TO (연관됨)
 
 규칙:
-- 텍스트에 포함된 내용만 추출하세요.
-- 중요한 조항, 규칙, 기관, 계정과목, 개체, 지침 등을 노드로 추출하세요.
+- 텍스트에 실질적으로 명시되거나 추론 가능한 명확한 관계만 추출하세요.
 - relationship의 source와 target은 반드시 nodes의 id 중 하나여야 합니다.
 
 텍스트:
