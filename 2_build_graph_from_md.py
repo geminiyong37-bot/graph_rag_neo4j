@@ -85,6 +85,10 @@ def ensure_schema():
               `vector.similarity_function`: 'cosine'
             }}
             """)
+            g.query("""
+            CREATE FULLTEXT INDEX chunk_fulltext_index IF NOT EXISTS
+            FOR (c:Chunk) ON EACH [c.text]
+            """)
             _schema_initialized = True
         except Exception as e:
             print(f"[WARN] Schema initialization warning: {e}", flush=True)
