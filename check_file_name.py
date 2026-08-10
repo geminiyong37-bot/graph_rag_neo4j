@@ -22,13 +22,17 @@ def check_chunks():
         with driver.session(database=DATABASE) as session:
             query = """
             MATCH (c:Chunk)
-            RETURN c.id AS id, c.file_name AS file_name, substring(c.text, 0, 50) AS preview
-            LIMIT 5
+            RETURN coalesce(c.file_name, '출처 미상') AS file_name, count(c) AS count
+            ORDER BY count DESC
             """
             result = session.run(query)
-            print("=== [Neo4j 데이터 샘플 5개 확인] ===")
-            for row in result:
-                print(f"ID: {row['id']} | 파일명 라벨: '{row['file_name']}' | 본문 미리보기: {row['preview']}...")
+            print("=== [Neo4j 데이터베이스에 임베딩된 전체 파일 목록] ===")
+            records = list(result)
+            if not records:
+                print("⚠️ DB에 저장된 데이터(Chunk)가 하나도 없어!")
+            else:
+                for row in records:
+                    print(f"📄 파일명: '{row['file_name']}' | (청크 수: {row['count']}개)")
     except Exception as e:
         print(f"[ERROR] 조회 오류: {e}")
     finally:
@@ -36,3 +40,4 @@ def check_chunks():
 
 if __name__ == "__main__":
     check_chunks()
+

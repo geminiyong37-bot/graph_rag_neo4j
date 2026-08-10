@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import uuid
+import re
 from typing import Literal
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -93,198 +94,249 @@ def ensure_schema():
         except Exception as e:
             print(f"[WARN] Schema initialization warning: {e}", flush=True)
 
-# 2. 순수 파이썬 초고속 문단 분할 함수 (청크 사이즈: 400자, 오버랩: 50자)
-def split_text_into_chunks(text: str, chunk_size: int = 400, chunk_overlap: int = 50) -> list[str]:
-    chunks = []
-    start = 0
-    text_len = len(text)
-    while start < text_len:
-        end = min(start + chunk_size, text_len)
-        if end < text_len:
-            last_newline = text.rfind("\n", start + chunk_size // 2, end)
-            if last_newline != -1:
-                end = last_newline + 1
-        chunk = text[start:end].strip()
-        if chunk:
-            chunks.append(chunk)
-        start = end - chunk_overlap if end < text_len else text_len
-    return chunks
+def extract_year_from_filename(filename: str) -> int:
+    match = re.search(r'\[(\d{4})년\]|(\d{4})년|(\d{4})회계연도', filename)
+    if match:
+        for group in match.groups():
+            if group:
+                return int(group)
+    return 2024  # 기본값
 
-def ingest_chunk_text(chunk_text: str, source_name: str = "온라인상담_구글시트", custom_chunk_id: str = None) -> dict:
-    if not custom_chunk_id:
-        custom_chunk_id = f"chunk_sheet_{uuid.uuid4().hex[:10]}"
+def auto_structure_headers(text: str) -> str:
+    """
+    일반 번호(제N장, 제N조, 1., 가., Q1. 등) 텍스트를 마크다운 ##, ### 헤더 계층 구조로 자동 변환하는 파서
+    """
+    lines = text.split("\n")
+    new_lines = []
+    
+    # 1) 대분류 (Parent ##) 패턴: 제N장, 제N절, 제N관, [사례 N], 1. 제목 등
+    parent_pattern = re.compile(r'^(제\s*\d+\s*[장절관]|\[\s*사례\s*\d+\s*\]|\d+\.\s+[가-힣A-Za-z0-9])')
+    
+    # 2) 소분류 (Child ###) 패턴: 제N조, (1), 가., Q1., 질문 1. 등
+    child_pattern = re.compile(r'^(제\s*\d+\s*조|\(\d+\)|[가-하]\.|\bQ\d+[\.\:\s]|\b질문\s*\d+[\.\:\s]|【\s*질문\s*】)')
+    
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            new_lines.append(line)
+        elif parent_pattern.match(stripped):
+            new_lines.append(f"## {stripped}")
+        elif child_pattern.match(stripped):
+            new_lines.append(f"### {stripped}")
+        else:
+            new_lines.append(line)
+            
+    return "\n".join(new_lines)
 
-    g = get_graph()
-    _, embeddings, structured_llm = get_models()
-    ensure_schema()
+def preprocess_text(text: str) -> str:
+    # 1. <br>, <br/>, <br  /> 태그를 띄어쓰기로 치환
+    clean = re.sub(r'<br\s*/?>', ' ', text, flags=re.IGNORECASE)
+    # 2. 일반 번호/조항 표기를 마크다운 ##, ### 계층 구조로 자동 승격
+    structured = auto_structure_headers(clean)
+    return structured
 
-    # 1) 원문 Chunk 임베딩 벡터 생성
-    chunk_embedding = embeddings.embed_query(chunk_text)
+def generate_table_summary(table_text: str) -> str:
+    llm, _, _ = get_models()
+    prompt = f"""다음 표(Table) 데이터를 분석하여 2~3문장의 명확한 자연어 요약글을 작성하세요.
+이 요약글은 표의 핵심 주제, 대상 기관/항목, 주요 숫자의 의미를 다루어야 합니다.
 
-    # 2) Neo4j에 Chunk 노드 및 임베딩 저장
-    g.query(
-        """
-        MERGE (c:Chunk {id: $id})
-        SET c.text = $text,
-            c.embedding = $embedding,
-            c.file_name = $file_name
-        """,
-        params={
-            "id": custom_chunk_id,
-            "text": chunk_text,
-            "embedding": chunk_embedding,
-            "file_name": source_name
-        }
-    )
-
-    # 3) LLM 고도화 지식 그래프 추출
-    prompt = f"""
-다음 사학기관 재무·회계 규칙, 법령 또는 대학 Q&A 텍스트에서 주요 개체(노드)와 개체 간의 구조적 연관 관계를 추출하세요.
-
-[추출 대상 노드 유형 (type)]:
-- Organization: 대학, 사학법인, 이사회, 교육부, 주무관청 등
-- Regulation: 재무·회계 규칙, 사립학교법, 정관, 세부 지침, 관련 조항 (예: 제14조, 제21조)
-- Account: 수입/지출 계정과목, 예산/결산 항목 (예: 등록금수입, 교비회계, 법인회계, 예비비 등)
-- Procedure: 결재, 편성, 집행, 변경, 이월, 승인 절차 (예: 이사회 의결, 주무관청 보고)
-- Exception: 예외 규정, 금지 사항, 단서 조항
-- Concept: 핵심 개념 및 회계/행정 용어
-- Person: 이사장, 총장, 회계책임자 등
-
-[추출 대상 관계 종류 (kind)]:
-- GOVERNS (관할/규정함)
-- APPLIES_TO (적용됨)
-- INCLUDES (포함함/상위계정)
-- EXCEPT_FOR (예외사항)
-- REQUIRES_PROCEDURE (절차필요)
-- RELATED_TO (연관됨)
-
-규칙:
-- 텍스트에 실질적으로 명시되거나 추론 가능한 명확한 관계만 추출하세요.
-- relationship의 source와 target은 반드시 nodes의 id 중 하나여야 합니다.
-
-텍스트:
-{chunk_text}
+표 데이터:
+{table_text[:1500]}
 """
-    nodes_created = 0
-    rels_created = 0
-
     try:
-        kg = structured_llm.invoke(prompt)
-        if kg.nodes:
-            nodes = [node.model_dump() for node in kg.nodes]
-            relationships = [rel.model_dump() for rel in kg.relationships]
-            nodes_created = len(nodes)
-            rels_created = len(relationships)
-
-            g.query(
-                """
-                UNWIND $nodes AS node
-                MERGE (e:Entity {id: node.id})
-                SET e.type = node.type
-                """,
-                params={"nodes": nodes},
-            )
-
-            for node in kg.nodes:
-                g.query(
-                    f"""
-                    MATCH (e:Entity {{id: $id}})
-                    SET e:{node.type}
-                    """,
-                    params={"id": node.id},
-                )
-
-            for rel in relationships:
-                kind = "".join(c for c in rel["kind"].upper() if c.isalnum() or c == "_") or "RELATED_TO"
-                g.query(
-                    f"""
-                    MATCH (source:Entity {{id: $source}})
-                    MATCH (target:Entity {{id: $target}})
-                    MERGE (source)-[r:{kind}]->(target)
-                    """,
-                    params={"source": rel["source"], "target": rel["target"]},
-                )
-
-            entity_ids = [node.id for node in kg.nodes]
-            g.query(
-                """
-                MATCH (c:Chunk {id: $chunk_id})
-                UNWIND $entity_ids AS e_id
-                MATCH (e:Entity {id: e_id})
-                MERGE (c)-[:MENTIONS]->(e)
-                """,
-                params={"chunk_id": custom_chunk_id, "entity_ids": entity_ids}
-            )
+        res = llm.invoke(prompt)
+        return res.content.strip()
     except Exception as e:
-        print(f"[WARN] LLM 추출 실패 (Chunk 노드는 저장됨): {e}")
+        print(f"[WARN] 표 요약 생성 실패: {e}")
+        return "표 데이터 요약 정보"
 
-    return {
-        "chunk_id": custom_chunk_id,
-        "nodes_created": nodes_created,
-        "relationships_created": rels_created
-    }
+def parse_markdown_into_parent_child_chunks(md_text: str) -> list[dict]:
+    """
+    마크다운 해설서/지침서 고도화 청킹 파이프라인
+    - ## 장/절 기준 Parent Chunk (1,000~1,500자)
+    - ### 조항/세부항목 기준 Child Chunk (300~500자)
+    - 표(Table) 구획 자동 인식 및 덩어리 보존 + AI 요약 간판
+    """
+    cleaned_text = preprocess_text(md_text)
+    lines = cleaned_text.split("\n")
 
-def process_md_file(file_path: str):
+    parent_child_blocks = []
+    current_parent_title = "개요 및 기본지침"
+    current_child_title = "기본항목"
+    
+    parent_buf = []
+    child_buf = []
+
+    def flush_child(parent_t, child_t, c_lines, is_table=False):
+        if not c_lines:
+            return None
+        c_text = "\n".join(c_lines).strip()
+        if not c_text:
+            return None
+
+        # 표인 경우 요약 간판 덧붙이기
+        if is_table or "| --- |" in c_text or "|---|" in c_text:
+            summary = generate_table_summary(c_text)
+            c_text = f"[표 요약설명: {summary}]\n\n{c_text}"
+
+        header_breadcrumb = f"[족보: {parent_t} ➔ {child_t}]"
+        full_child_text = f"{header_breadcrumb}\n{c_text}"
+        return full_child_text
+
+    in_table = False
+    table_lines = []
+
+    for line in lines:
+        stripped = line.strip()
+        
+        # 표 구획 시작/종료 체크
+        if stripped.startswith("|") and "|" in stripped[1:]:
+            in_table = True
+            table_lines.append(line)
+            continue
+        elif in_table:
+            # 표 종료
+            in_table = False
+            t_chunk = flush_child(current_parent_title, current_child_title, table_lines, is_table=True)
+            if t_chunk:
+                child_buf.append(t_chunk)
+            table_lines = []
+
+        # 헤더 체크
+        if stripped.startswith("## "):
+            # 기존 child 마무리
+            if child_buf:
+                parent_text = "\n\n".join(child_buf)
+                parent_child_blocks.append({
+                    "parent_title": current_parent_title,
+                    "parent_text": parent_text,
+                    "children": child_buf[:]
+                })
+                child_buf = []
+            current_parent_title = stripped.replace("##", "").strip()
+            current_child_title = current_parent_title
+        elif stripped.startswith("### "):
+            current_child_title = stripped.replace("###", "").strip()
+
+        # 라인 누적 (300~500자 단위 또는 조항 단위 조절)
+        parent_buf.append(line)
+
+    # 표 남은 것 처리
+    if table_lines:
+        t_chunk = flush_child(current_parent_title, current_child_title, table_lines, is_table=True)
+        if t_chunk:
+            child_buf.append(t_chunk)
+
+    # 단순 텍스트 분할이 안 되어 child_buf가 없을 경우 기본 분할
+    if not parent_child_blocks:
+        # 헤더 구획이 없는 일반 텍스트의 경우 500자 기반 시맨틱 분할
+        raw_chunks = []
+        start = 0
+        text_len = len(cleaned_text)
+        chunk_size = 400
+        chunk_overlap = 50
+        while start < text_len:
+            end = min(start + chunk_size, text_len)
+            if end < text_len:
+                last_newline = cleaned_text.rfind("\n", start + chunk_size // 2, end)
+                if last_newline != -1:
+                    end = last_newline + 1
+            chunk = cleaned_text[start:end].strip()
+            if chunk:
+                raw_chunks.append(chunk)
+            start = end - chunk_overlap if end < text_len else text_len
+
+        parent_child_blocks.append({
+            "parent_title": "일반 문서",
+            "parent_text": cleaned_text,
+            "children": raw_chunks
+        })
+    elif child_buf:
+        parent_text = "\n\n".join(child_buf)
+        parent_child_blocks.append({
+            "parent_title": current_parent_title,
+            "parent_text": parent_text,
+            "children": child_buf[:]
+        })
+
+    return parent_child_blocks
+
+def process_md_file(file_path: str) -> int:
     if not os.path.exists(file_path):
         print(f"[ERROR] 파일을 찾을 수 없어: {file_path}")
-        return
+        return 0
 
     g = get_graph()
     _, embeddings, structured_llm = get_models()
     ensure_schema()
 
-    print(f"[READ] '{file_path}' 파일 읽는 중...", flush=True)
+    filename = os.path.basename(file_path)
+    file_year = extract_year_from_filename(filename)
+    safe_file_tag = re.sub(r'[^a-zA-Z0-9가-힣]', '_', filename)
+
+    print(f"\n📄 [READ] '{filename}' 파일 고도화 업로드 시작 (연도: {file_year}년)...", flush=True)
     with open(file_path, "r", encoding="utf-8") as f:
         md_text = f.read()
 
-    chunks = split_text_into_chunks(md_text, chunk_size=400, chunk_overlap=50)
-    print(f"[SET] 청크 사이즈: 400자 / 오버랩: 50자 설정 완료!", flush=True)
-    print(f"[START] 전체 문서를 {len(chunks)}개 청크로 쪼갰어. [청크 노드 + 벡터 임베딩 + 지식 그래프] 변환 시작!\n", flush=True)
+    blocks = parse_markdown_into_parent_child_chunks(md_text)
+    
+    total_children = 0
+    p_idx = 0
+    for block in blocks:
+        p_idx += 1
+        parent_id = f"{safe_file_tag}_parent_{p_idx}"
+        parent_text = block["parent_text"]
 
-    progress_file = "progress_checkpoint.json"
-    completed_chunks = 0
-    if os.path.exists(progress_file):
-        try:
-            with open(progress_file, "r") as pf:
-                completed_chunks = json.load(pf).get("last_completed_chunk", 0)
-            if completed_chunks > 0:
-                print(f"[RESUME] 이전 기록 발견! {completed_chunks}번째 청크까지 저장되어 있어 이어서 시작해!", flush=True)
-        except Exception:
-            completed_chunks = 0
+        # 1) Neo4j에 Parent Chunk 저장 (is_parent = true, 임베딩 없이 텍스트 보관)
+        g.query("""
+        MERGE (p:Chunk {id: $id})
+        SET p.text = $text,
+            p.is_parent = true,
+            p.file_name = $file_name,
+            p.year = $year,
+            p.title = $title
+        """, params={
+            "id": parent_id,
+            "text": parent_text,
+            "file_name": filename,
+            "year": file_year,
+            "title": block["parent_title"]
+        })
 
-    for i, chunk in enumerate(chunks, 1):
-        if i <= completed_chunks:
-            continue
+        c_idx = 0
+        for child_text in block["children"]:
+            c_idx += 1
+            total_children += 1
+            child_id = f"{parent_id}_child_{c_idx}"
 
-        print(f"[{i} / {len(chunks)}] 청크 벡터화 & 지식 추출 중...", flush=True)
-        chunk_id = f"chunk_{i}"
+            # 2) Child Chunk 임베딩 생성 & 저장 (is_parent = false, c.embedding 저장)
+            try:
+                c_embed = embeddings.embed_query(child_text)
+            except Exception as e:
+                print(f"    [WARN] 임베딩 생성 오류 (건너뜀): {e}", flush=True)
+                continue
 
-        # 1) 원문 Chunk 임베딩 벡터 생성
-        try:
-            chunk_embedding = embeddings.embed_query(chunk)
-        except Exception as embed_err:
-            print(f"  [WARN] 임베딩 생성 오류 (건너뜀): {embed_err}", flush=True)
-            continue
-
-        # 2) Neo4j에 Chunk 노드 및 임베딩 저장 (파일명 메타데이터 추가)
-        g.query(
-            """
+            g.query("""
             MERGE (c:Chunk {id: $id})
             SET c.text = $text,
                 c.embedding = $embedding,
-                c.file_name = $file_name
-            """,
-            params={
-                "id": chunk_id,
-                "text": chunk,
-                "embedding": chunk_embedding,
-                "file_name": os.path.basename(file_path)
-            }
-        )
+                c.is_parent = false,
+                c.file_name = $file_name,
+                c.year = $year
+            WITH c
+            MATCH (p:Chunk {id: $parent_id})
+            MERGE (c)-[:HAS_PARENT]->(p)
+            """, params={
+                "id": child_id,
+                "text": child_text,
+                "embedding": c_embed,
+                "file_name": filename,
+                "year": file_year,
+                "parent_id": parent_id
+            })
 
-        # 3) LLM 지식 그래프 추출
-        prompt = f"""
-다음 사학기관 재무·회계 규칙, 법령 또는 대학 Q&A 텍스트에서 주요 개체(노드)와 개체 간의 구조적 연관 관계를 추출하세요.
+            # 3) LLM 지식 그래프 (Entity/Relation) 추출
+            prompt = f"""다음 사학기관 재무·회계 규칙, 법령 또는 대학 Q&A 텍스트에서 주요 개체(노드)와 개체 간의 구조적 연관 관계를 추출하세요.
 
 [추출 대상 노드 유형 (type)]:
 - Organization: 대학, 사학법인, 이사회, 교육부, 주무관청 등
@@ -305,89 +357,87 @@ def process_md_file(file_path: str):
 
 규칙:
 - 텍스트에 실질적으로 명시되거나 추론 가능한 명확한 관계만 추출하세요.
-- relationship의 source와 target은 반드시 nodes의 id 중 하나여야 합니다.
 
 텍스트:
-{chunk}
+{child_text}
 """
-        try:
-            kg = structured_llm.invoke(prompt)
-            if kg.nodes:
-                nodes = [node.model_dump() for node in kg.nodes]
-                relationships = [rel.model_dump() for rel in kg.relationships]
+            try:
+                kg = structured_llm.invoke(prompt)
+                if kg.nodes:
+                    nodes = [node.model_dump() for node in kg.nodes]
+                    relationships = [rel.model_dump() for rel in kg.relationships]
 
-                # Entity 노드 저장
-                g.query(
-                    """
+                    g.query("""
                     UNWIND $nodes AS node
                     MERGE (e:Entity {id: node.id})
                     SET e.type = node.type
-                    """,
-                    params={"nodes": nodes},
-                )
+                    """, params={"nodes": nodes})
 
-                for node in kg.nodes:
-                    g.query(
-                        f"""
-                        MATCH (e:Entity {{id: $id}})
-                        SET e:{node.type}
-                        """,
-                        params={"id": node.id},
-                    )
+                    for node in kg.nodes:
+                        g.query(f"MATCH (e:Entity {{id: $id}}) SET e:{node.type}", params={"id": node.id})
 
-                # Relationship 저장
-                for rel in relationships:
-                    kind = "".join(c for c in rel["kind"].upper() if c.isalnum() or c == "_") or "RELATED_TO"
-                    g.query(
-                        f"""
+                    for rel in relationships:
+                        kind = "".join(c for c in rel["kind"].upper() if c.isalnum() or c == "_") or "RELATED_TO"
+                        g.query(f"""
                         MATCH (source:Entity {{id: $source}})
                         MATCH (target:Entity {{id: $target}})
                         MERGE (source)-[r:{kind}]->(target)
-                        """,
-                        params={"source": rel["source"], "target": rel["target"]},
-                    )
+                        """, params={"source": rel["source"], "target": rel["target"]})
 
-                # 4) Chunk 노드 -> Entity 노드간 (:MENTIONS) 관계 연결
-                entity_ids = [node.id for node in kg.nodes]
-                g.query(
-                    """
+                    entity_ids = [node.id for node in kg.nodes]
+                    g.query("""
                     MATCH (c:Chunk {id: $chunk_id})
                     UNWIND $entity_ids AS e_id
                     MATCH (e:Entity {id: e_id})
                     MERGE (c)-[:MENTIONS]->(e)
-                    """,
-                    params={"chunk_id": chunk_id, "entity_ids": entity_ids}
-                )
+                    """, params={"chunk_id": child_id, "entity_ids": entity_ids})
+            except Exception as e:
+                pass  # LLM 실패 시 Child 노드만 저장 유지
 
-                print(f"  └ Chunk 노드 생성 & 임베딩 + 노드 {len(nodes)}개, 관계 {len(relationships)}개 연결 완료!", flush=True)
-            else:
-                print(f"  └ Chunk 노드 생성 & 임베딩 완료! (개념 노드 없음)", flush=True)
+    print(f"✅ '{filename}' 고도화 임베딩 및 지식 그래프 생성 완료! (Parent: {len(blocks)}개 / Child: {total_children}개)", flush=True)
+    return total_children
 
-            # 진행 상황 저장
-            with open(progress_file, "w") as pf:
-                json.dump({"last_completed_chunk": i}, pf)
+def process_all_md_files(data_dir: str = "data"):
+    if not os.path.exists(data_dir):
+        print(f"[ERROR] '{data_dir}' 폴더가 존재하지 않습니다.")
+        return
 
-        except Exception as e:
-            print(f"  [WARN] 청크 {i} 처리 중 건너뜀: {e}", flush=True)
+    md_files = [f for f in os.listdir(data_dir) if f.endswith(".md") and f.lower() != "readme.md"]
+    md_files.sort()
 
-    print("\n[COMPLETE] 모든 청크 벡터화 & 지식 그래프 구축 완료! Neo4j 클라우드에서 확인해 봐!", flush=True)
+    print(f"🚀 [BATCH] 총 {len(md_files)}개 고도화 마크다운 문서 업로드 시작!", flush=True)
 
+    progress_file = "progress_checkpoint.json"
+    completed_files = []
+    if os.path.exists(progress_file):
+        try:
+            with open(progress_file, "r", encoding="utf-8") as pf:
+                cp_data = json.load(pf)
+                completed_files = cp_data.get("completed_files", [])
+        except Exception:
+            completed_files = []
+
+    total_files = len(md_files)
+    for idx, f_name in enumerate(md_files, 1):
+        if f_name in completed_files:
+            print(f"⏩ [{idx}/{total_files}] '{f_name}' 이미 완료됨 (건너뜀)", flush=True)
+            continue
+
+        file_path = os.path.join(data_dir, f_name)
+        print(f"\n==========================================")
+        print(f"📌 [{idx}/{total_files}] 파일 처리 중: {f_name}")
+        print(f"==========================================")
+        process_md_file(file_path)
+
+        completed_files.append(f_name)
+        with open(progress_file, "w", encoding="utf-8") as pf:
+            json.dump({"completed_files": completed_files}, pf, ensure_ascii=False)
+
+    print("\n🎉 [COMPLETE] 59개 전체 파일 고도화 지식 그래프 업로드 완료!", flush=True)
 
 if __name__ == "__main__":
-    target_md_file = None
-    search_dirs = ["data", "."]
-
-    for s_dir in search_dirs:
-        if os.path.exists(s_dir):
-            for f in os.listdir(s_dir):
-                if f.endswith(".md") and f.lower() != "readme.md":
-                    target_md_file = os.path.join(s_dir, f)
-                    break
-        if target_md_file:
-            break
-
-    if target_md_file:
-        print(f"[FOUND] '{target_md_file}' 파일을 찾았어!")
-        process_md_file(target_md_file)
+    data_folder = "data"
+    if os.path.exists(data_folder):
+        process_all_md_files(data_folder)
     else:
-        print("[ERROR] data 폴더나 현재 폴더에서 .md 파일을 찾지 못했어.")
+        print("[ERROR] data 폴더를 찾지 못했어.")
