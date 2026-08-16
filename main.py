@@ -28,7 +28,8 @@ app = FastAPI(
 
 class QuestionRequest(BaseModel):
     question: str
-    top_k: int = 3
+    top_k: int = 5
+    category: str = ""
 
 class AnswerResponse(BaseModel):
     status: str = "success"
@@ -59,7 +60,7 @@ def ask_question(req: QuestionRequest):
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     
     try:
-        answer = hybrid_search_and_answer(req.question.strip(), top_k=req.top_k)
+        answer = hybrid_search_and_answer(req.question.strip(), top_k=req.top_k, category=req.category.strip())
         return AnswerResponse(
             status="success",
             question=req.question,

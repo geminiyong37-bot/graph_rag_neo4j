@@ -136,25 +136,18 @@ def preprocess_text(text: str) -> str:
     return structured
 
 def generate_table_summary(table_text: str) -> str:
-    llm, _, _ = get_models()
-    prompt = f"""다음 표(Table) 데이터를 분석하여 2~3문장의 명확한 자연어 요약글을 작성하세요.
-이 요약글은 표의 핵심 주제, 대상 기관/항목, 주요 숫자의 의미를 다루어야 합니다.
-
-표 데이터:
-{table_text[:1500]}
-"""
-    try:
-        res = llm.invoke(prompt)
-        return res.content.strip()
-    except Exception as e:
-        print(f"[WARN] 표 요약 생성 실패: {e}")
-        return "표 데이터 요약 정보"
+    lines = [l.strip() for l in table_text.strip().split("\n") if l.strip()]
+    if not lines:
+        return "표 데이터"
+    headers = [col.strip() for col in lines[0].split("|") if col.strip()]
+    header_str = ", ".join(headers[:5]) if headers else "기본 항목"
+    return f"표 항목 ({header_str})"
 
 def parse_markdown_into_parent_child_chunks(md_text: str) -> list[dict]:
     """
     마크다운 해설서/지침서 고도화 청킹 파이프라인
     - ## 장/절 기준 Parent Chunk (1,000~1,500자)
-    - ### 조항/세부항목 기준 Child Chunk (300~500자)
+    - ### 조항/세부항목 및 문단 기준 Child Chunk (300~800자)
     - 표(Table) 구획 자동 인식 및 덩어리 보존 + AI 요약 간판
     """
     cleaned_text = preprocess_text(md_text)
@@ -164,24 +157,47 @@ def parse_markdown_into_parent_child_chunks(md_text: str) -> list[dict]:
     current_parent_title = "개요 및 기본지침"
     current_child_title = "기본항목"
     
-    parent_buf = []
     child_buf = []
+    current_text_lines = []
 
-    def flush_child(parent_t, child_t, c_lines, is_table=False):
-        if not c_lines:
-            return None
-        c_text = "\n".join(c_lines).strip()
+    def flush_current_text():
+        nonlocal current_text_lines
+        if not current_text_lines:
+            return
+        text_content = "\n".join(current_text_lines).strip()
+        current_text_lines = []
+        if not text_content:
+            return
+        
+        header_breadcrumb = f"[족보: {current_parent_title} ➔ {current_child_title}]"
+        full_child_text = f"{header_breadcrumb}\n{text_content}"
+        child_buf.append(full_child_text)
+
+    def flush_table(table_lines):
+        if not table_lines:
+            return
+        c_text = "\n".join(table_lines).strip()
         if not c_text:
-            return None
+            return
 
-        # 표인 경우 요약 간판 덧붙이기
-        if is_table or "| --- |" in c_text or "|---|" in c_text:
-            summary = generate_table_summary(c_text)
-            c_text = f"[표 요약설명: {summary}]\n\n{c_text}"
+        summary = generate_table_summary(c_text)
+        c_text = f"[표 요약설명: {summary}]\n\n{c_text}"
 
-        header_breadcrumb = f"[족보: {parent_t} ➔ {child_t}]"
+        header_breadcrumb = f"[족보: {current_parent_title} ➔ {current_child_title}]"
         full_child_text = f"{header_breadcrumb}\n{c_text}"
-        return full_child_text
+        child_buf.append(full_child_text)
+
+    def flush_parent():
+        nonlocal child_buf, current_parent_title
+        flush_current_text()
+        if child_buf:
+            parent_text = "\n\n".join(child_buf)
+            parent_child_blocks.append({
+                "parent_title": current_parent_title,
+                "parent_text": parent_text,
+                "children": child_buf[:]
+            })
+            child_buf = []
 
     in_table = False
     table_lines = []
@@ -191,49 +207,42 @@ def parse_markdown_into_parent_child_chunks(md_text: str) -> list[dict]:
         
         # 표 구획 시작/종료 체크
         if stripped.startswith("|") and "|" in stripped[1:]:
-            in_table = True
+            if not in_table:
+                flush_current_text()
+                in_table = True
             table_lines.append(line)
             continue
         elif in_table:
-            # 표 종료
             in_table = False
-            t_chunk = flush_child(current_parent_title, current_child_title, table_lines, is_table=True)
-            if t_chunk:
-                child_buf.append(t_chunk)
+            flush_table(table_lines)
             table_lines = []
 
         # 헤더 체크
         if stripped.startswith("## "):
-            # 기존 child 마무리
-            if child_buf:
-                parent_text = "\n\n".join(child_buf)
-                parent_child_blocks.append({
-                    "parent_title": current_parent_title,
-                    "parent_text": parent_text,
-                    "children": child_buf[:]
-                })
-                child_buf = []
+            flush_parent()
             current_parent_title = stripped.replace("##", "").strip()
             current_child_title = current_parent_title
+            continue
         elif stripped.startswith("### "):
+            flush_current_text()
             current_child_title = stripped.replace("###", "").strip()
+            continue
 
-        # 라인 누적 (300~500자 단위 또는 조항 단위 조절)
-        parent_buf.append(line)
+        current_text_lines.append(line)
+        current_len = sum(len(l) for l in current_text_lines)
+        if current_len >= 800:
+            flush_current_text()
 
-    # 표 남은 것 처리
-    if table_lines:
-        t_chunk = flush_child(current_parent_title, current_child_title, table_lines, is_table=True)
-        if t_chunk:
-            child_buf.append(t_chunk)
+    if in_table and table_lines:
+        flush_table(table_lines)
+    flush_parent()
 
-    # 단순 텍스트 분할이 안 되어 child_buf가 없을 경우 기본 분할
+    # 헤더 구획이 전무한 문서인 경우 400자 분할 기본 처리
     if not parent_child_blocks:
-        # 헤더 구획이 없는 일반 텍스트의 경우 500자 기반 시맨틱 분할
         raw_chunks = []
         start = 0
         text_len = len(cleaned_text)
-        chunk_size = 400
+        chunk_size = 500
         chunk_overlap = 50
         while start < text_len:
             end = min(start + chunk_size, text_len)
@@ -250,13 +259,6 @@ def parse_markdown_into_parent_child_chunks(md_text: str) -> list[dict]:
             "parent_title": "일반 문서",
             "parent_text": cleaned_text,
             "children": raw_chunks
-        })
-    elif child_buf:
-        parent_text = "\n\n".join(child_buf)
-        parent_child_blocks.append({
-            "parent_title": current_parent_title,
-            "parent_text": parent_text,
-            "children": child_buf[:]
         })
 
     return parent_child_blocks
@@ -304,10 +306,12 @@ def process_md_file(file_path: str) -> int:
         })
 
         c_idx = 0
+        total_in_block = len(block["children"])
         for child_text in block["children"]:
             c_idx += 1
             total_children += 1
             child_id = f"{parent_id}_child_{c_idx}"
+            print(f"    🧩 [{c_idx}/{total_in_block}] 자식 청크 저장 및 지식 추출 중...", flush=True)
 
             # 2) Child Chunk 임베딩 생성 & 저장 (is_parent = false, c.embedding 저장)
             try:
@@ -373,16 +377,30 @@ def process_md_file(file_path: str) -> int:
                     SET e.type = node.type
                     """, params={"nodes": nodes})
 
+                    nodes_by_type = {}
                     for node in kg.nodes:
-                        g.query(f"MATCH (e:Entity {{id: $id}}) SET e:{node.type}", params={"id": node.id})
+                        safe_label = "".join(c for c in node.type if c.isalnum()) or "Entity"
+                        nodes_by_type.setdefault(safe_label, []).append(node.id)
 
+                    for label_name, id_list in nodes_by_type.items():
+                        g.query(f"""
+                        UNWIND $ids AS id
+                        MATCH (e:Entity {{id: id}})
+                        SET e:{label_name}
+                        """, params={"ids": id_list})
+
+                    rels_by_kind = {}
                     for rel in relationships:
                         kind = "".join(c for c in rel["kind"].upper() if c.isalnum() or c == "_") or "RELATED_TO"
+                        rels_by_kind.setdefault(kind, []).append({"source": rel["source"], "target": rel["target"]})
+
+                    for kind_name, rel_list in rels_by_kind.items():
                         g.query(f"""
-                        MATCH (source:Entity {{id: $source}})
-                        MATCH (target:Entity {{id: $target}})
-                        MERGE (source)-[r:{kind}]->(target)
-                        """, params={"source": rel["source"], "target": rel["target"]})
+                        UNWIND $rels AS rel
+                        MATCH (source:Entity {{id: rel.source}})
+                        MATCH (target:Entity {{id: rel.target}})
+                        MERGE (source)-[r:{kind_name}]->(target)
+                        """, params={"rels": rel_list})
 
                     entity_ids = [node.id for node in kg.nodes]
                     g.query("""
@@ -392,7 +410,7 @@ def process_md_file(file_path: str) -> int:
                     MERGE (c)-[:MENTIONS]->(e)
                     """, params={"chunk_id": child_id, "entity_ids": entity_ids})
             except Exception as e:
-                pass  # LLM 실패 시 Child 노드만 저장 유지
+                print(f"    [WARN] 청크 지식 추출/저장 예외 발생: {e}", flush=True)
 
     print(f"✅ '{filename}' 고도화 임베딩 및 지식 그래프 생성 완료! (Parent: {len(blocks)}개 / Child: {total_children}개)", flush=True)
     return total_children
