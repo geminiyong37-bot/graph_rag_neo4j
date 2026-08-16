@@ -107,9 +107,7 @@ PRIORITY_FILES_SCHOOL_FOUNDATION = [
 
 PRIORITY_FILES_LOW = [
     "[참고용]",
-    "대학_ESG_가이드라인_배포용",
-    "비영리조직회계기준",
-    "지방교육행정기관 업무추진비 집행에 관한 규칙 해설자료"
+    "대학_ESG_가이드라인_배포용"
 ]
 
 
