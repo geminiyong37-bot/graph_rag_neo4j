@@ -184,13 +184,13 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
             # 기본 RRF 점수
             added_rrf = 1.0 / (RRF_K + rank)
 
-            # 1. 교비/법인 회계 질문 시 [최우선] 3대 핵심 문서 가중치(Boost 2.5x) 적용
-            if any(pf in fname for pf in PRIORITY_FILES_SCHOOL_FOUNDATION):
-                added_rrf *= 2.5
+            # 1. 교비/법인 회계 질문 시 [최우선] 3대 핵심 문서 가중치(Boost 1.8x) 적용
+            if is_school_or_foundation and any(pf in fname for pf in PRIORITY_FILES_SCHOOL_FOUNDATION):
+                added_rrf *= 1.8
 
-            # 2. [참고용] 하위순위 문서 감점(Penalty 0.3x) 적용
+            # 2. [참고용] 하위순위 문서 감점(Penalty 0.5x) 적용
             if any(lf in fname for lf in PRIORITY_FILES_LOW):
-                added_rrf *= 0.3
+                added_rrf *= 0.5
 
             if cid not in chunk_scores:
                 chunk_scores[cid] = {
@@ -233,13 +233,13 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
                 orig_item = sorted_chunks[item.index]
                 orig_item["rerank_score"] = item.relevance_score
                 
-                # [최우선] Rerank 점수 가중치 (1.5x)
-                if any(pf in orig_item["file_name"] for pf in PRIORITY_FILES_SCHOOL_FOUNDATION):
-                    orig_item["rerank_score"] *= 1.5
+                # 교비/법인회계 시 [최우선] Rerank 점수 가중치 (1.25x)
+                if is_school_or_foundation and any(pf in orig_item["file_name"] for pf in PRIORITY_FILES_SCHOOL_FOUNDATION):
+                    orig_item["rerank_score"] *= 1.25
                 
-                # [참고용] 하위순위 문서 Rerank 점수 감점 (0.5x)
+                # [참고용] 하위순위 문서 Rerank 점수 감점 (0.7x)
                 if any(lf in orig_item["file_name"] for lf in PRIORITY_FILES_LOW):
-                    orig_item["rerank_score"] *= 0.5
+                    orig_item["rerank_score"] *= 0.7
                 
                 final_chunks.append(orig_item)
             
