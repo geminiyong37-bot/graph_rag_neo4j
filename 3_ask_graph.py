@@ -40,18 +40,12 @@ driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USERNAME, NEO4J_PASSWORD))
 llm = ChatOpenAI(model=OPENAI_MODEL, temperature=0)
 embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
+llm_fast = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
 STOPWORDS = {
     "어떻게", "처리", "방법", "알려줘", "문의", "궁금합니다", "관하여", "대해",
     "무엇인가요", "무엇", "등", "및", "위한", "따른", "관한", "있나요", "하나요",
-    "인가요", "경우", "관련", "질문", "답변", "규정", "내용", "설명", "안녕하세요",
-    "문의드립니다", "제공하는", "이유로", "목적으로", "지출이라는", "아니면", "성격에",
-    "집행할", "수", "있는지", "확인하였습니다", "안내를", "안내", "원칙적으로", "적정하다는",
-    "하여야", "하는지", "목적", "성격", "집행"
-}
-
-ACCOUNTING_KEYWORDS = {
-    "복리후생비", "업무추진비", "식사비", "식대", "경조사비", "명절선물비", "교직원", "내부인원",
-    "외부인원", "교비회계", "법인회계", "기금", "계정과목", "간담회", "회의비", "현물식사대"
+    "인가요", "경우", "관련", "질문", "답변", "규정", "내용", "설명"
 }
 
 
@@ -75,26 +69,32 @@ def clean_korean_word(word: str) -> str:
     return word
 
 def extract_search_keywords(question: str) -> str:
-    """질문에서 불용어 및 조사를 제거하고 핵심 회계 키워드를 우선 배치하여 BM25 OR 연산용 키워드 생성"""
-    raw_tokens = re.sub(r"[^\w\s]", " ", question).split()
-    clean_tokens = []
-    priority_tokens = []
-    
-    for w in raw_tokens:
-        cw = clean_korean_word(w)
-        if len(cw) > 1 and cw not in STOPWORDS:
-            if cw in ACCOUNTING_KEYWORDS or any(ak in cw for ak in ACCOUNTING_KEYWORDS):
-                priority_tokens.append(cw)
-            else:
-                clean_tokens.append(cw)
+    """AI(gpt-4o-mini)를 활용하여 질의의 문맥과 뉘앙스를 종합 판단, BM25 키워드 검색에 최적화된 핵심 단어 5~10개를 동적으로 추출"""
+    try:
+        prompt = f"""당신은 검색엔진(BM25/Lucene)용 키워드 추출 전문가입니다.
+사용자의 질의에서 지식 검색에 가장 결정적인 핵심 키워드(5개~10개)를 추출하세요.
+질문의 길이가 길더라도 전체 뉘앙스와 의도를 파악하여 핵심 대상, 행위, 지침/규정 용어, 계정과목, 문제 상황을 나타내는 단어만 추출하세요.
+불필요한 인사말, 문맥 수식어('문의드립니다', '경우', '관하여', '원칙적으로' 등)는 완전히 제외하세요.
 
-    # 핵심 회계 키워드 우선 배치 + 일반 키워드
-    all_ordered = priority_tokens + clean_tokens
-    if not all_ordered:
-        all_ordered = [w for w in raw_tokens if len(w) > 1]
-    
-    unique_tokens = list(dict.fromkeys(all_ordered))
-    return " OR ".join(unique_tokens[:12])
+[질문]: {question}
+
+[출력 형식]: 키워드1 키워드2 키워드3 (단어만 공백으로 구분하여 출력, 부연설명 절대 금지)"""
+        res = llm_fast.invoke(prompt)
+        kw_str = res.content.strip()
+        tokens = [clean_korean_word(w) for w in re.sub(r"[^\w\s]", " ", kw_str).split() if len(w) > 1]
+        unique_tokens = list(dict.fromkeys(tokens))
+        if unique_tokens:
+            extracted_query = " OR ".join(unique_tokens[:10])
+            print(f"🤖 [AI 키워드 추출기] 동적 추출 키워드: '{extracted_query}'", flush=True)
+            return extracted_query
+    except Exception as e:
+        print(f"  [WARN] AI 키워드 추출 예외 발생 (기존 규칙 기반 추출로 대체): {e}", flush=True)
+
+    # Fallback to rule-based tokenization if LLM call fails
+    raw_tokens = re.sub(r"[^\w\s]", " ", question).split()
+    clean_tokens = [clean_korean_word(w) for w in raw_tokens if len(w) > 1 and w not in STOPWORDS]
+    unique_tokens = list(dict.fromkeys(clean_tokens))
+    return " OR ".join(unique_tokens[:10])
 
 
 PRIORITY_FILES_SCHOOL_FOUNDATION = [
