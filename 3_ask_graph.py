@@ -43,7 +43,15 @@ embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 STOPWORDS = {
     "어떻게", "처리", "방법", "알려줘", "문의", "궁금합니다", "관하여", "대해",
     "무엇인가요", "무엇", "등", "및", "위한", "따른", "관한", "있나요", "하나요",
-    "인가요", "경우", "관련", "질문", "답변", "규정", "내용", "설명"
+    "인가요", "경우", "관련", "질문", "답변", "규정", "내용", "설명", "안녕하세요",
+    "문의드립니다", "제공하는", "이유로", "목적으로", "지출이라는", "아니면", "성격에",
+    "집행할", "수", "있는지", "확인하였습니다", "안내를", "안내", "원칙적으로", "적정하다는",
+    "하여야", "하는지", "목적", "성격", "집행"
+}
+
+ACCOUNTING_KEYWORDS = {
+    "복리후생비", "업무추진비", "식사비", "식대", "경조사비", "명절선물비", "교직원", "내부인원",
+    "외부인원", "교비회계", "법인회계", "기금", "계정과목", "간담회", "회의비", "현물식사대"
 }
 
 
@@ -58,7 +66,8 @@ def clean_korean_word(word: str) -> str:
     """한국어 조사 및 어미 제거"""
     suffixes = [
         "에서부터", "에서", "에대한", "에게는", "에게", "에서는", "의", "는", "은", "를", "을",
-        "으로", "로", "와", "과", "에", "도", "인가요", "하나요", "하며", "하고", "해서", "입니다"
+        "으로", "로", "와", "과", "에", "도", "인가요", "하나요", "하며", "하고", "해서", "입니다",
+        "이라는", "라는", "에서는", "으로만"
     ]
     for s in suffixes:
         if word.endswith(s) and len(word) >= len(s) + 2:
@@ -66,34 +75,41 @@ def clean_korean_word(word: str) -> str:
     return word
 
 def extract_search_keywords(question: str) -> str:
-    """질문에서 불용어 및 조사를 제거하고 BM25 OR 연산용 키워드 생성"""
+    """질문에서 불용어 및 조사를 제거하고 핵심 회계 키워드를 우선 배치하여 BM25 OR 연산용 키워드 생성"""
     raw_tokens = re.sub(r"[^\w\s]", " ", question).split()
     clean_tokens = []
+    priority_tokens = []
+    
     for w in raw_tokens:
         cw = clean_korean_word(w)
         if len(cw) > 1 and cw not in STOPWORDS:
-            clean_tokens.append(cw)
-            if cw != w:
-                clean_tokens.append(w)
-    if not clean_tokens:
-        clean_tokens = [w for w in raw_tokens if len(w) > 1]
+            if cw in ACCOUNTING_KEYWORDS or any(ak in cw for ak in ACCOUNTING_KEYWORDS):
+                priority_tokens.append(cw)
+            else:
+                clean_tokens.append(cw)
+
+    # 핵심 회계 키워드 우선 배치 + 일반 키워드
+    all_ordered = priority_tokens + clean_tokens
+    if not all_ordered:
+        all_ordered = [w for w in raw_tokens if len(w) > 1]
     
-    # 중복 제거 후 상위 키워드로 OR 쿼리 구성
-    unique_tokens = list(dict.fromkeys(clean_tokens))
-    return " OR ".join(unique_tokens[:8])
+    unique_tokens = list(dict.fromkeys(all_ordered))
+    return " OR ".join(unique_tokens[:12])
 
 
 PRIORITY_FILES_SCHOOL_FOUNDATION = [
     "[최우선]",
     "사학기관_재무회계_규칙에_관한_특례규칙_해설서",
     "사립대학(법인) 회계관리 안내서 개정본",
-    "사립대학(법인) 기본재산 관리 안내서"
+    "사립대학(법인) 기본재산 관리 안내서",
+    "사학기관+회계기준+실무사례와+해설"
 ]
 
 PRIORITY_FILES_LOW = [
     "[참고용]",
     "대학_ESG_가이드라인_배포용",
-    "비영리조직회계기준"
+    "비영리조직회계기준",
+    "지방교육행정기관 업무추진비 집행에 관한 규칙 해설자료"
 ]
 
 
@@ -168,13 +184,13 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
             # 기본 RRF 점수
             added_rrf = 1.0 / (RRF_K + rank)
 
-            # 1. 교비/법인 회계 질문 시 [최우선] 3대 핵심 문서 가중치(Boost 1.8x) 적용
-            if is_school_or_foundation and any(pf in fname for pf in PRIORITY_FILES_SCHOOL_FOUNDATION):
-                added_rrf *= 1.8
+            # 1. 교비/법인 회계 질문 시 [최우선] 3대 핵심 문서 가중치(Boost 2.5x) 적용
+            if any(pf in fname for pf in PRIORITY_FILES_SCHOOL_FOUNDATION):
+                added_rrf *= 2.5
 
-            # 2. [참고용] 하위순위 문서 감점(Penalty 0.5x) 적용
+            # 2. [참고용] 하위순위 문서 감점(Penalty 0.3x) 적용
             if any(lf in fname for lf in PRIORITY_FILES_LOW):
-                added_rrf *= 0.5
+                added_rrf *= 0.3
 
             if cid not in chunk_scores:
                 chunk_scores[cid] = {
@@ -217,13 +233,13 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
                 orig_item = sorted_chunks[item.index]
                 orig_item["rerank_score"] = item.relevance_score
                 
-                # 교비/법인회계 시 [최우선] Rerank 점수 가중치 (1.25x)
-                if is_school_or_foundation and any(pf in orig_item["file_name"] for pf in PRIORITY_FILES_SCHOOL_FOUNDATION):
-                    orig_item["rerank_score"] *= 1.25
+                # [최우선] Rerank 점수 가중치 (1.5x)
+                if any(pf in orig_item["file_name"] for pf in PRIORITY_FILES_SCHOOL_FOUNDATION):
+                    orig_item["rerank_score"] *= 1.5
                 
-                # [참고용] 하위순위 문서 Rerank 점수 감점 (0.7x)
+                # [참고용] 하위순위 문서 Rerank 점수 감점 (0.5x)
                 if any(lf in orig_item["file_name"] for lf in PRIORITY_FILES_LOW):
-                    orig_item["rerank_score"] *= 0.7
+                    orig_item["rerank_score"] *= 0.5
                 
                 final_chunks.append(orig_item)
             
