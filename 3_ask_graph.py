@@ -111,6 +111,58 @@ PRIORITY_FILES_LOW = [
 ]
 
 
+def build_rerank_passage(row: dict) -> str:
+    """Cohere가 검색된 자식 근거 자체를 평가하도록 짧고 명확한 문서를 구성한다."""
+    return f"""출처 파일: {row.get('file_name', '출처 미상')}
+상위 주제: {row.get('parent_title', '주제 미상')}
+직접 검색된 근거:
+{row.get('child_text', '')}"""
+
+
+def group_chunks_by_parent(rows: list[dict]) -> tuple[dict, list[str]]:
+    """선택된 자식 근거를 보존하면서 동일한 부모 본문을 한 번만 묶는다."""
+    parent_map = {}
+    ordered_parents = []
+
+    for row in rows:
+        p_text = row.get("parent_text") or row.get("child_text", "")
+        if p_text not in parent_map:
+            parent_map[p_text] = {
+                "parent_text": p_text,
+                "parent_title": row.get("parent_title", "주제 미상"),
+                "file_name": row.get("file_name", "출처 미상"),
+                "year": row.get("year", 2024),
+                "rerank_score": row.get("rerank_score", 0),
+                "child_evidence": [],
+                "entities": set(),
+                "relations": set(),
+            }
+            ordered_parents.append(p_text)
+
+        child_text = row.get("child_text", "").strip()
+        if child_text and child_text not in parent_map[p_text]["child_evidence"]:
+            parent_map[p_text]["child_evidence"].append(child_text)
+
+        for entity in row.get("direct_entities", []):
+            if isinstance(entity, dict) and entity.get("id"):
+                parent_map[p_text]["entities"].add(
+                    f"{entity['id']} ({entity.get('type', '개체')})"
+                )
+
+        for relation in row.get("hop1_relations", []):
+            if (
+                isinstance(relation, dict)
+                and relation.get("source")
+                and relation.get("target")
+                and relation.get("rel")
+            ):
+                parent_map[p_text]["relations"].add(
+                    f"{relation['source']} --[{relation['rel']}]--> {relation['target']}"
+                )
+
+    return parent_map, ordered_parents
+
+
 def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") -> str:
     print(f"\n❓ 질문: {question} (구분: {category or '기본'})", flush=True)
     print("🔍 [1단계: 고도화된 Neo4j 하이브리드 검색 - BM25 키워드 + 벡터 + 1-Hop 정밀 지식그래프]", flush=True)
@@ -136,6 +188,7 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
         RETURN child.id AS child_id,
                child.text AS child_text,
                coalesce(parent.text, child.text) AS parent_text,
+               coalesce(parent.title, child.title, '주제 미상') AS parent_title,
                coalesce(child.file_name, '출처 미상') AS file_name,
                coalesce(child.year, 2024) AS year,
                score AS vector_score,
@@ -157,6 +210,7 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
                 RETURN child.id AS child_id,
                        child.text AS child_text,
                        coalesce(parent.text, child.text) AS parent_text,
+                       coalesce(parent.title, child.title, '주제 미상') AS parent_title,
                        coalesce(child.file_name, '출처 미상') AS file_name,
                        coalesce(child.year, 2024) AS year,
                        score AS fulltext_score,
@@ -196,6 +250,7 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
                     "child_id": cid,
                     "child_text": row.get("child_text", ""),
                     "parent_text": row.get("parent_text", ""),
+                    "parent_title": row.get("parent_title", "주제 미상"),
                     "file_name": fname,
                     "year": row.get("year", 2024),
                     "vector_score": row.get("vector_score", 0) if is_vector else 0,
@@ -215,10 +270,10 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
 
     print(f"🏆 RRF 1차 통합 후보 {len(sorted_chunks)}개 추출 완료!", flush=True)
 
-    # --- [2단계: Cohere Reranker 정밀 재정렬 (부모 본문 문맥으로 정밀 평가)] ---
+    # --- [2단계: Cohere Reranker 정밀 재정렬 (부모 제목 + 자식 근거로 정밀 평가)] ---
     if HAS_COHERE and len(sorted_chunks) > 1:
-        print("🎯 [2단계: Cohere Reranker v3.0] 전체 부모 본문 문맥 기반 다국어 정밀 심사 중...", flush=True)
-        passages = [f"{r['file_name']}\n{r['parent_text']}" for r in sorted_chunks]
+        print("🎯 [2단계: Cohere Reranker v3.0] 부모 제목 + 자식 근거 기반 다국어 정밀 심사 중...", flush=True)
+        passages = [build_rerank_passage(row) for row in sorted_chunks]
         try:
             rerank_res = cohere_client.rerank(
                 model="rerank-multilingual-v3.0",
@@ -250,33 +305,8 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
     else:
         sorted_chunks = sorted_chunks[:top_k]
 
-    # --- [3단계: 부모 본문 중복 병합 + [참고용] 하위순위 문단 후순위 배치] ---
-    parent_map = {}
-    ordered_parents = []
-
-    for row in sorted_chunks:
-        p_text = row.get("parent_text", row.get("child_text", ""))
-        if p_text not in parent_map:
-            parent_map[p_text] = {
-                "parent_text": p_text,
-                "file_name": row.get("file_name", "출처 미상"),
-                "year": row.get("year", 2024),
-                "rerank_score": row.get("rerank_score", 0),
-                "entities": set(),
-                "relations": set()
-            }
-            ordered_parents.append(p_text)
-
-        # direct_entities 병합
-        for e in row.get("direct_entities", []):
-            if isinstance(e, dict) and e.get("id"):
-                parent_map[p_text]["entities"].add(f"{e['id']} ({e.get('type', '개체')})")
-
-        # 1-Hop relations 병합
-        for r in row.get("hop1_relations", []):
-            if isinstance(r, dict) and r.get("source") and r.get("target") and r.get("rel"):
-                rel_str = f"{r['source']} --[{r['rel']}]--> {r['target']}"
-                parent_map[p_text]["relations"].add(rel_str)
+    # --- [3단계: 직접 근거 보존 + 부모 본문 중복 병합 + 참고 문단 후순위 배치] ---
+    parent_map, ordered_parents = group_chunks_by_parent(sorted_chunks)
 
     # 하위순위([참고용]) 문단은 프롬프트 문맥 맨 뒤로 배치
     normal_parents = [p for p in ordered_parents if not any(lf in parent_map[p]["file_name"] for lf in PRIORITY_FILES_LOW)]
@@ -291,6 +321,8 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
         file_name = info["file_name"]
         year = info["year"]
         rerank_score = info["rerank_score"]
+        parent_title = info["parent_title"]
+        child_evidence = info["child_evidence"]
         
         entities_str = ", ".join(sorted(list(info["entities"]))) or "없음"
         relations_list = sorted(list(info["relations"]))
@@ -298,9 +330,18 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
 
         rerank_info = f" / Cohere Rerank 점수: {rerank_score:.4f}" if rerank_score > 0 else ""
         low_tag = " [하위순위 보충 참고용]" if any(lf in file_name for lf in PRIORITY_FILES_LOW) else ""
+        evidence_str = "\n\n".join(
+            f"[직접 근거 {idx}]\n{text}"
+            for idx, text in enumerate(child_evidence, 1)
+        ) or "직접 검색된 자식 근거 없음"
 
         block = f"""[참고 문단 {display_idx}{low_tag} (출처 파일: {file_name} / 지침 연도: {year}년{rerank_info})]
-어미 해설 및 전체 본문 내용:
+상위 주제: {parent_title}
+
+질문과 직접 연관되어 검색·재정렬된 핵심 근거:
+{evidence_str}
+
+어미 해설 및 전체 보충 문맥:
 {p_text}
 
 직접 연관된 핵심 개체: {entities_str}
@@ -316,14 +357,14 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
     if is_school_or_foundation:
         priority_instruction = """
 6. [교비회계/법인회계 3대 안전 프롬프트 장치]: 본 질의는 '교비회계' 또는 '법인회계' 관련 사안입니다.
-   - [안전 장치 1: 명시적 규정 절대 적용]: 출처 파일명에 `[최우선]` 표기가 있는 핵심 문서(특례규칙 해설서 등)에 구체적인 계정과목 기준이 명시된 경우(예: "교직원 내부 인원에 대한 식사비/경조사비/명절선물비는 복리후생비로 처리하고, 외부인원에 대한 식사비/경조사비/명절선물비는 업무추진비로 처리하는 것이 적절하다"), 반드시 문서의 규정을 절대적 원칙으로 답변하세요. 일반 기업 회계 방식이나 개인적 추측을 섞어 "간담회 목적이면 내부인원 식사도 업무추진비로 가능하다"는 식으로 규정을 임의로 자의적 해석하거나 물타기하지 마세요.
+   - [안전 장치 1: 명시적 규정 절대 적용]: 출처 파일명에 `[최우선]` 표기가 있는 핵심 문서에 구체적인 기준이나 원칙이 명시된 경우, 이를 절대적인 기준으로 삼아 답변하세요. 외부의 일반 기업 회계 상식이나 개인적 추측을 섞어 명시된 원칙을 자의적으로 해석하거나 예외를 지어내지 마세요.
    - [안전 장치 2: 미언급 시 차순위 유기적 보완]: 위 `[최우선]` 문서에 직접적인 언급이나 명시가 없는 사안에 한해서만, 차순위 안내서, 유의사항, Q&A 사례의 문맥을 유기적으로 통합하여 보완 설명하세요.
-   - [안전 장치 3: 가짜 조항 환각 방지 및 출처 엄격 인용]: 법령이나 조항 번호를 기재할 때는 오직 검색된 문맥에 실제로 존재하는 조항 번호와 출처 파일명만 엄격히 인용하고, 본문에 없는 조항 번호(예: 제21조 등)를 임의로 조합하거나 추측하여 지어내지 마세요."""
+   - [안전 장치 3: 출처 엄격 인용 및 환각 방지]: 법령이나 조항 번호를 기재할 때는 오직 검색된 문맥에 실제로 존재하는 조항 번호와 출처 파일명만 엄격히 인용하세요. 본문에 없는 조항 번호를 임의로 조합하거나 추측하여 지어내지 마세요."""
 
     system_prompt = f"""당신은 사학기관 재무·회계 규칙 및 대학 온라인 상담 지식에 특화된 최고 수준의 GraphRAG 전문 AI입니다.
 
 제공된 문맥에는 2가지 유형의 지식이 포함되어 있습니다:
-1. [어미 해설 및 전체 본문 내용]: Cohere Reranker와 하이브리드 검색(벡터+BM25 키워드)으로 찾아낸 관련 지식 본문
+1. [직접 근거 및 어미 해설]: Cohere Reranker가 부모 제목과 자식 근거로 정밀 심사한 핵심 문장 및 그 부모 보충 문맥
 2. [지식 그래프 정밀 연관망]: 핵심 개체, 법률 조항, 계정과목, 예외 규정, 절차 간의 1-Hop 구조적 연관 관계망
 
 답변 작성 지침 (엄격 적용):
