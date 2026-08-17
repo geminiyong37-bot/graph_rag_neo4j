@@ -18,13 +18,20 @@ declare
   safe_match_count int := greatest(1, least(coalesce(match_count, 20), 50));
   fts_query tsquery := null;
 begin
-  -- plainto_tsquery가 특수문자를 안전하게 정리한 후 AND를 OR로 바꾼다.
+  -- 긴 질문 전체를 OR로 만들면 후보가 폭증하므로 긴 핵심어 8개만 사용한다.
   if nullif(btrim(query_text), '') is not null then
-    fts_query := replace(
-      plainto_tsquery('simple', query_text)::text,
-      ' & ',
-      ' | '
-    )::tsquery;
+    select string_agg(quote_literal(lexeme), ' | ')::tsquery
+    into fts_query
+    from (
+      select lexeme
+      from unnest(
+        tsvector_to_array(to_tsvector('simple', query_text))
+      ) as lexeme
+      where char_length(lexeme) >= 2
+      group by lexeme
+      order by char_length(lexeme) desc, lexeme
+      limit 8
+    ) as keywords;
   end if;
 
   return query

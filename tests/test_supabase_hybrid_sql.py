@@ -16,8 +16,9 @@ class SupabaseHybridSqlTests(unittest.TestCase):
 
         self.assertIn("match_univ_documents_hybrid_v2", sql)
         self.assertNotIn("drop function match_univ_documents_hybrid", sql.lower())
-        self.assertIn("plainto_tsquery('simple', query_text)", sql)
-        self.assertIn("' & ',", sql)
+        self.assertIn("tsvector_to_array(to_tsvector('simple', query_text))", sql)
+        self.assertIn("order by char_length(lexeme) desc", sql)
+        self.assertIn("limit 8", sql)
         self.assertIn("' | '", sql)
 
     def test_v2_sql_limits_match_count_and_handles_empty_query(self):
