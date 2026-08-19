@@ -503,7 +503,7 @@ return [{
 
 - [ ] **Step 3: 원문 질문 임베딩 HTTP 요청을 구성한다.**
 
-`HTTP Request` 노드를 추가하고 기존 `OpenAi account` 자격 증명을 사용한다. 다음 요청만 보낸다.
+`HTTP Request` 노드를 추가하고 기존 OpenAI API 자격 증명을 사용한다. 다음 요청만 보낸다.
 
 ```text
 POST https://api.openai.com/v1/embeddings
@@ -532,7 +532,7 @@ return [{ json: { ...search, query_embedding: embedding } }];
 
 - [ ] **Step 4: V3 Supabase RPC HTTP 요청을 구성한다.**
 
-두 번째 `HTTP Request` 노드를 추가한다. 기존 `Hybrid Search for QnA` Supabase 자격 증명을 선택하고 다음 JSON 본문을 사용한다.
+두 번째 `HTTP Request` 노드를 추가한다. 기존 Supabase API 자격 증명을 선택하고 다음 JSON 본문을 사용한다.
 
 ```json
 {
@@ -553,7 +553,7 @@ https://<project-ref>.supabase.co/rest/v1/rpc/match_univ_documents_hybrid_v3
 
 - [ ] **Step 5: Cohere 재정렬과 단일 도구 응답을 구성한다.**
 
-V3 RPC 결과를 후보 순서대로 20개 이하로 제한한 뒤, `POST https://api.cohere.com/v2/rerank` 요청을 보낸다. 기존 `CohereApi geminiyong` 자격 증명을 사용한다.
+V3 RPC 결과를 후보 순서대로 20개 이하로 제한한 뒤, `POST https://api.cohere.com/v2/rerank` 요청을 보낸다. 기존 Cohere API 자격 증명을 사용한다.
 
 ```json
 {

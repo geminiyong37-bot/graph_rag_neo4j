@@ -153,9 +153,9 @@ cohere==7.0.8
 V3 계획서의 표시명을 다음처럼 바꾼다.
 
 ```text
-OpenAi account → OpenAI API 자격 증명
-Hybrid Search for QnA → Supabase API 자격 증명
-CohereApi geminiyong → Cohere API 자격 증명
+OpenAI 표시명 → OpenAI API 자격 증명
+Supabase 표시명 → Supabase API 자격 증명
+Cohere 표시명 → Cohere API 자격 증명
 ```
 
 ### Task 5: 정리 결과 검증과 커밋

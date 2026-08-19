@@ -1,137 +1,108 @@
-# GraphRAG 간단 실습
+# 대학·사학기관 회계 GraphRAG
 
-LangChain, OpenAI, Neo4j를 사용해 한국어 문장에서 간단한 지식 그래프를 만들고, 그래프를 기반으로 질문하는 GraphRAG 실습 코드입니다.
+대학과 학교법인의 재무·회계 질의에 근거 문서를 찾아 답변하는 GraphRAG 프로젝트야. 기존 Neo4j 검색 경로를 보존하면서, n8n에서 사용하는 Supabase 하이브리드 검색을 단계적으로 개선하고 있어.
 
-## 사전 준비
-1. Neo4j Desktop 설치 : https://incongruous-modem-465.notion.site/Neo4j-Desktop-3769cc89b5d980d7b95dd68f32417076?source=copy_link
+## 현재 구성
 
-## 실습 흐름
+```text
+회계·법률 Markdown 문서
+  ├─ Neo4j: Parent/Child 청크 + Vector/BM25 + 지식 그래프
+  │    └─ Cohere 재정렬 → 근거 기반 답변
+  └─ Supabase: pgvector + PostgreSQL FTS
+       └─ n8n Draft Agent → Cohere 재정렬 → 답변
+```
 
-1. Neo4j 연결을 확인합니다.
-2. 한국어 문장에서 엔티티와 관계를 추출 및 Neo4j 그래프로 저장합니다
-3. 저장된 그래프를 대상으로 자연어 질문을 실행합니다.
+| 영역 | 상태 | 설명 |
+| --- | --- | --- |
+| Neo4j GraphRAG | 유지 | 문서 적재, Vector/BM25 검색, 지식 그래프, 답변 검증 로직 |
+| Supabase V2 | 구현 완료 | 안전한 OR FTS와 Vector 결과를 RRF로 결합 |
+| Supabase V3 | 설계·구현 계획 완료 | 원문 질문 Vector, 핵심어 엄격 검색, 확장 검색을 분리할 예정 |
+| n8n | 외부 운영 | 현재 워크플로우는 n8n에서 관리하며 V3 연결 절차는 계획서에 기록 |
 
-## 파일 구성
+> V3 SQL과 n8n 서브워크플로우는 아직 구현 전이야. 저장소에 있는 V3 문서는 확정된 설계와 실행 계획이야.
 
-| 파일 | 설명 |
+## 핵심 파일
+
+| 경로 | 역할 |
 | --- | --- |
-| `1_test_connection.py` | `.env`에 설정한 Neo4j 접속 정보로 연결을 테스트합니다. |
-| `2_build_graph.py` | OpenAI 모델로 문장에서 지식 그래프를 추출하고 Neo4j에 저장합니다. |
-| `3_ask_graph.py` | Neo4j 그래프 스키마를 읽고 `GraphCypherQAChain`으로 질문에 답합니다. |
-| `requirements.txt` | 현재 실습 환경의 패키지 버전 목록입니다. |
+| `data/` | 대학·사학기관 회계 원문 Markdown 자료 |
+| `2_build_graph_from_md.py` | 원문을 Parent/Child 청크와 지식 그래프로 Neo4j에 적재 |
+| `3_ask_graph.py` | Neo4j 하이브리드 검색, Cohere 재정렬, 근거 기반 답변 생성 |
+| `main.py` / `Procfile` | 기존 Render API 진입점과 배포 설정 |
+| `supabase/sql/001_match_univ_documents_hybrid_v2.sql` | Supabase 하이브리드 검색 V2 함수 |
+| `supabase/run_hybrid_regression.py` | V1·V2 검색 품질 비교 도구 |
+| `supabase/regression_cases.json` | 검색 회귀 사례 |
+| `tests/` | Neo4j 답변 문맥과 Supabase SQL·회귀 도구의 단위 테스트 |
+| `docs/superpowers/specs/` | 검색 구조 설계서 |
+| `docs/superpowers/plans/` | 구현·통합 계획과 검증 절차 |
 
-## 준비 사항
+## 환경 설정
 
-- Python 3.10 이상 권장
-- OpenAI API 키
-- Neo4j Desktop 앱
+Python 3.10 이상을 권장해.
 
-## 패키지 설치
-
-가상환경을 만든 뒤 필요한 패키지를 설치합니다.
-
-```bash
+```powershell
 python -m venv .venv
-source .venv/bin/activate
-pip install -U langchain langchain-openai langchain-neo4j python-dotenv
-```
-
-이미 `requirements.txt` 기준으로 동일한 환경을 맞추고 싶다면 다음 명령을 사용할 수도 있습니다.
-
-```bash
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+Copy-Item .env_example .env
 ```
 
-macOS의 경우
-```bash
-pip install -r requirements_macos.txt
-```
-
-## 환경변수 설정
-
-프로젝트 루트에 `.env` 파일을 만들고 아래 값을 채웁니다.
+`.env`에 실제 환경 값을 입력해.
 
 ```env
-OPENAI_API_KEY=your_openai_api_key
-NEO4J_URI=neo4j+s://your-neo4j-host
-NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=your_neo4j_password
-```
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4o-mini
 
-필요하면 모델명과 데이터베이스 이름도 추가할 수 있습니다.
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=...
 
-```env
-OPENAI_MODEL=gpt-5.5
+NEO4J_URI=neo4j+s://your-instance.databases.neo4j.io
+NEO4J_USERNAME=...
+NEO4J_PASSWORD=...
 NEO4J_DATABASE=neo4j
 ```
 
-`OPENAI_MODEL`을 지정하지 않으면 코드에서는 기본값으로 `gpt-5.5`를 사용합니다.
+## 실행과 검증
 
-## 실행 방법
+Neo4j 연결 확인:
 
-### 1. Neo4j 연결 테스트
-
-```bash
+```powershell
 python 1_test_connection.py
 ```
 
-정상 연결되면 다음 메시지가 출력됩니다.
+Neo4j 문서 적재:
 
-```text
-Neo4j 연결 성공!
+```powershell
+python 2_build_graph_from_md.py
 ```
 
-### 2. 지식 그래프 생성
+Neo4j 질의:
 
-```bash
-python 2_build_graph.py
-```
-
-이 스크립트는 아래 문장에서 노드와 관계를 추출합니다.
-
-```text
-김민수는 결제 시스템 리팩터링을 담당했다.
-결제 시스템 리팩터링은 장애율을 낮추기 위한 프로젝트였다.
-결제 시스템 리팩터링은 보안팀과 플랫폼팀이 공동으로 진행했다.
-```
-
-추출된 그래프는 Neo4j에 `Entity` 노드로 저장되며, 타입에 따라 `Person`, `Project`, `Team`, `Metric`, `System`, `Unknown` 라벨이 추가됩니다.
-
-생성되는 관계 타입은 다음과 같습니다.
-
-| 관계 | 의미 |
-| --- | --- |
-| `RESPONSIBLE_FOR` | 사람이 프로젝트나 업무를 담당함 |
-| `AIMS_TO_REDUCE` | 프로젝트가 어떤 지표를 낮추는 목적을 가짐 |
-| `COLLABORATED_ON` | 팀이 프로젝트를 공동 진행함 |
-| `RELATED_TO` | 기타 일반 관계 |
-
-### 3. 그래프에 질문하기
-
-```bash
+```powershell
 python 3_ask_graph.py
 ```
 
-현재 예제 질문은 다음과 같습니다.
+전체 단위 테스트:
 
-```text
-김민수와 보안팀은 어떤 관계야?
+```powershell
+python -m unittest discover -s tests -v
 ```
 
-`GraphCypherQAChain`이 Neo4j 스키마를 바탕으로 Cypher 쿼리를 생성하고, 그래프 조회 결과를 자연어 답변으로 정리합니다.
+Supabase V1·V2 회귀 비교:
 
-## Neo4j에서 확인하기
-
-Neo4j Desktop에서 다음 Cypher로 생성된 그래프를 확인할 수 있습니다.
-
-```cypher
-MATCH (n)-[r]->(m)
-RETURN n, r, m
+```powershell
+python supabase/run_hybrid_regression.py
 ```
 
-전체 노드만 보고 싶다면 다음 쿼리를 실행합니다.
+## Supabase 문서
 
-```cypher
-MATCH (n)
-RETURN n
-```
+- [V2 설계](docs/superpowers/specs/2026-08-17-supabase-hybrid-search-v2-design.md)
+- [V2 구현 계획](docs/superpowers/plans/2026-08-17-supabase-hybrid-search-v2.md)
+- [V3 핵심어 인지형 검색 설계](docs/superpowers/specs/2026-08-18-keyword-aware-hybrid-search-v3-design.md)
+- [V3 구현 계획](docs/superpowers/plans/2026-08-18-keyword-aware-hybrid-search-v3.md)
+
+## 보안과 자료 관리
+
+- `.env`, API 키, n8n 자격 증명, 로컬 데이터베이스는 커밋하지 않아.
+- n8n 워크플로우를 내보낼 때는 자격 증명 ID와 비밀값을 제거해야 해.
+- `data/`의 원문을 외부에 재배포하기 전에는 출처, 이용 조건, 포함된 연락처 정보를 확인해야 해.

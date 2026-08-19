@@ -20,6 +20,12 @@ htmlcov/
 
 .worktrees/
 
+.claude/
+.n8n/
+node_modules/
+*.sqlite
+*.sqlite3
+
 .DS_Store
 
 *.log
