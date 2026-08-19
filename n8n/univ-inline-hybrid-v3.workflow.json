@@ -1,0 +1,1131 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=분석 대상 : {{ $json.output }}\n\n최종 결과는 다음의 양식에 따라 출력하시오.\n질의 작성일 : 입력된 질의 작성일[원문]\n구분 : 입력된 구분[원문]\n제목 : 입력된 제목[원문]\n질의 내용 : 입력된 질의 내용[원문]\n1. 질의 요약 : 질의 내용 요약(1~2줄, 질문이 여러개면 질문당 1~2줄)\n2. 답변 : 질문 내용 상 세부질문 기준으로 각 질문 당 200자(공백포함) 이내로 정리하고 친절하고 전문성 있는 어조로 다듬는다. 다만, 내용이 많다면 200자를 초과해도 무방하다.\n3. 관련 법령 : '2.답변' 내용을 참고하여 해당 사항이 없는 법령은 제외한다.\n4. 유사 사례 : 날짜가 '월', '일' 단위까지 포함되지 않은 경우 제외한다.\n\n<참고사항>\n - \"**\", 이모티콘, 마크다운 형식 등을 사용하지 않고 반드시 제시된 양식에 따라 출력하며 필요 시 번호(1. 2. 등) 하위로 \"-\"를 사용하여 작성한다.\n- 분석 대상에 질의응답 세트가 2개 이상일 경우, 이전 답변의 '4. 유사 사례' 끝부분과 다음 세트의 '제목' 시작 부분 사이에 반드시 줄바꿈(빈 줄)을 2번 넣어 시각적으로 명확히 분리한다.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        320,
+        3296
+      ],
+      "id": "5b424e2d-c156-4c4f-b80b-026f7f41fd6c",
+      "name": "Final Trimming"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=분석 대상 : {{ $json.output }}\n\n최종 결과는 다음의 양식에 따라 출력하시오.\n질의 작성일 : 입력된 값과 동일\n구분 : 입력된 구분[원문]\n제목 : 입력된 제목[원문]\n1. 질의 내용 : 입력된 질의 내용[원문]\n2. 답변 : 입력된 질의 내용[원문]\n3. 관련 법령 : 입력된 관련 법령[원문]\n4. 유사 사례 : 입력된 유사 사례[원문]",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -96,
+        3296
+      ],
+      "id": "64f0c4e9-e718-4d8d-8342-e51d66fbddc8",
+      "name": "Select Answer"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "==[질의 및 핵심어]\n{{ JSON.stringify({ question: $json.question, core_keywords: $json.core_keywords, optional_keywords: $json.optional_keywords }) }}\n\n==[검색된 근거]\n{{ JSON.stringify($json.chunks) }}\n\n위 question의 질의에 답변해. 반드시 검색된 근거의 content와 metadata에서 확인되는 내용만 사용해.\n\n[출력 양식]\n\n질의 작성일 : question의 질의 작성일 원문\n구분 : question의 구분 원문\n제목 : question의 제목 원문\n\n1. 질의 내용\n- question의 1.사실관계 원문\n- question의 2.질의사항 원문\n\n2. 답변(안)\n- 질문별로 검색된 근거와 판단을 작성해.\n- 질문이 여러 개이면 각각 구분해.\n- 각 답변은 원칙적으로 500자 내외로 작성해.\n\n3. 관련 법령\n- 답변에 실제로 사용한 법령의 명칭, 조항 번호, 조항 제목을 작성해.\n- 정확한 정보가 확인되지 않으면 “확인 가능한 관련 법령 없음”으로 작성해.\n- question의 3.관련법령은 참고정보로만 사용해.\n\n4. 유사 사례\n- 검색된 근거 중 [대학 온라인 상담]으로 표시된 사례만 사용해.\n- 제목과 연·월·일이 모두 확인되는 유사사례를 최대 3개 작성해.\n- 유사사례가 없으면 “해당 없음”으로 작성해.\n\n설명용 안내 문구, 이모티콘 및 불필요한 마크다운은 사용하지 마.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "너는 사립대학 재무·회계 상담 답변 작성자야.\n\n1. 제공된 검색 근거 chunks만 사용해 답변해.\n2. 검색 결과에 명시된 법령·지침·해설서·과거 Q&A 내용만 근거로 사용해.\n3. 일반 기업 회계 관행이나 사전 학습 지식으로 기준을 변경하거나 예외를 만들지 마.\n4. 검색 결과에 없는 사실, 법령, 조항 번호, 조항 제목 및 유사사례를 만들지 마.\n5. 법령의 명칭·조항·조항 제목이 검색 결과에서 모두 확인될 때만 관련 법령에 기재해.\n6. 자료가 충돌하면 현재 질문에 직접 적용되는 구체적인 기준을 우선하고 충돌 사실을 밝혀.\n7. 근거가 부족하면 단정하지 말고 검색 자료만으로 판단하기 어렵다고 밝혀.",
+          "maxIterations": 8,
+          "returnIntermediateSteps": true,
+          "enableStreaming": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1648,
+        2272
+      ],
+      "id": "038c37b8-94cd-42b9-b056-1b0566c3e51c",
+      "name": "Draft Answer Generator"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        352,
+        3024
+      ],
+      "id": "e344d437-4cf3-4cc1-9dbb-314de0afa4d2",
+      "name": "Embeddings OpenAI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "6Rrqctx2olyQCSPu",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "topN": 7
+      },
+      "type": "@n8n/n8n-nodes-langchain.rerankerCohere",
+      "typeVersion": 1,
+      "position": [
+        480,
+        3024
+      ],
+      "id": "c9f21c62-df64-4a9e-8762-1394c064e4dd",
+      "name": "Reranker Cohere",
+      "retryOnFail": true,
+      "credentials": {
+        "cohereApi": {
+          "id": "4s5hGPZyhpSsiwDU",
+          "name": "CohereApi geminiyong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "사립대학 회계 관련 법령, 실무 지침서, 점검 지적 사례가 포함된 지식 데이터베이스야.\n회계 처리 방법, 법적 준거성 검토, 감사 리스크 분석을 위해 반드시 이 도구를 사용하여 사실 관계와 근거 조항을 검색해야 해. 반드시 외부 지식이 아닌 이 데이터베이스의 내용만을 바탕으로 답변을 구성해.\n또한, 이 데이터베이스에는 과거의 '유사 질의응답(Q&A) 사례'도 포함되어 있어. 현재 질문과 맥락이나 쟁점이 비슷한 과거 사례를 찾을 때도 반드시 이 도구를 사용해.",
+        "tableName": {
+          "__rl": true,
+          "value": "대학 온라인 상담용 데이터",
+          "mode": "list",
+          "cachedResultName": "대학 온라인 상담용 데이터"
+        },
+        "topK": 20,
+        "useReranker": true,
+        "options": {
+          "queryName": "=match_univ_documents_hybrid_v2"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        336,
+        2816
+      ],
+      "id": "a1482006-90ce-4e03-b5ac-84bccb7f6b4e",
+      "name": "Supabase as AI Agent",
+      "credentials": {
+        "supabaseApi": {
+          "id": "cuI94cFv3pWMX3KE",
+          "name": "Hybrid Search for QnA"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "frequencyPenalty": 0.1,
+          "presencePenalty": 0.1,
+          "temperature": 0.1,
+          "topP": 0.8
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1648,
+        2496
+      ],
+      "id": "5dd90dbb-d2e9-428c-8c97-cd209571796a",
+      "name": "OpenAI Chat",
+      "retryOnFail": true,
+      "credentials": {
+        "openAiApi": {
+          "id": "6Rrqctx2olyQCSPu",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e68b58dc-6aa5-4760-b7c1-c4bba265a782",
+              "leftValue": "={{ $json.date }}",
+              "rightValue": "={{ $today.toFormat('yyyy-MM-dd') }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -1296,
+        3136
+      ],
+      "id": "41574d4d-32a4-46da-b38c-d46b516cd98f",
+      "name": "Today Question Only"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "title",
+              "cssSelector": ".bod_head + table.basic_table .list_tit.txtL",
+              "returnArray": true
+            },
+            {
+              "key": "url",
+              "cssSelector": ".bod_head + table.basic_table .list_tit.txtL a",
+              "returnValue": "attribute",
+              "attribute": "href",
+              "returnArray": true
+            },
+            {
+              "key": "date",
+              "cssSelector": ".bod_head + table.basic_table tbody td.list_date",
+              "returnArray": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        -1744,
+        3136
+      ],
+      "id": "e3dc6104-94d7-4df6-8f57-838d1d5da289",
+      "name": "List Set Extract"
+    },
+    {
+      "parameters": {
+        "jsCode": "let results = [];\n\n// items는 앞 노드에서 넘겨받은 전체 페이지(1페이지, 2페이지, 3페이지...)야.\n// for문을 써서 페이지 수만큼 반복해서 데이터를 빼내는 작업을 할 거야.\nfor (let item of items) {\n  const input = item.json;\n  \n  const titles = input.title || [];\n  const urls = input.url || [];\n  const dates = (input.date || []).filter(d => /\\d{4}[-.]\\d{2}[-.]\\d{2}/.test(d));\n\n  // 각 페이지당 추출된 데이터 수만큼 루프를 돌며 짝을 맞춘다.\n  // 이제 딱 10개씩 들어오기 때문에 listCount로 강제로 자를 필요가 없어졌어.\n  for (let i = 0; i < titles.length; i++) {\n    results.push({\n      json: {\n        title: titles[i].replace(/\\n/g, \"\").trim(), // 줄바꿈 제거\n        url: urls[i],\n        date: dates[i].replace(/\\./g, \"-\") // 날짜 형식을 YYYY-MM-DD로 통일\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1520,
+        3136
+      ],
+      "id": "2464f05d-da16-4aa5-a2dc-0e9adbcb3ab4",
+      "name": "List Set Configure"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "질의내역",
+              "cssSelector": ".basic_view"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        -848,
+        3136
+      ],
+      "id": "9f75ded3-78fc-490b-b279-e832b4f7950e",
+      "name": "Question Set Extract"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allData = $input.all();\nif (allData.length === 0) return [];\n\nreturn allData.map(item => {\n  // 1. 데이터 가져오기\n  const contentList = item.json[\"질의내역\"] || item.json[\"text\"] || \"\"; \n  let rawText = Array.isArray(contentList) ? contentList.join(\"\\n\") : contentList;\n  let text = rawText.trim();\n\n  let extractedTitle = \"제목 없음\";\n  let classification = \"구분 없음\";\n  let actualTitle = \"제목 없음\";\n  let inquiryDate = \"날짜 없음\"; // '질의 작성일'을 담을 변수\n\n  if (text) {\n    const lines = text.split('\\n');\n    \n    // --- 질의 작성일 추출 로직 ---\n    // 텍스트 내에서 '작성일 0000.00.00' 형태를 찾아 날짜만 가져옴\n    const dateMatch = text.match(/작성일\\s*(\\d{4}\\.\\d{2}\\.\\d{2})/);\n    if (dateMatch) {\n      inquiryDate = dateMatch[1]; \n    }\n\n    extractedTitle = lines[0].trim();\n\n    // 2. 제목 추출 및 '구분'과 '제목'으로 분리\n    const titleMatch = extractedTitle.match(/^(\\S+회계(?:\\[[^\\]]+\\])?)\\s+(.*)/);\n    if (titleMatch) {\n      classification = titleMatch[1].trim();\n      actualTitle = titleMatch[2].trim();\n    } else {\n      actualTitle = extractedTitle;\n    }\n  }\n\n  // [필터링 조건]: '교비' 또는 '법인'이 포함되지 않으면 제외\n  if (!classification.includes(\"교비\") && !classification.includes(\"법인\")) {\n    return null;\n  }\n\n  // --- 항목별 추출 함수 ---\n  function extractSection(targetText, startPattern, endPattern) {\n    const startMatch = targetText.match(startPattern);\n    if (!startMatch) return \"내용 없음\";\n    let startIndex = startMatch.index + startMatch[0].length;\n    let sectionText = targetText.substring(startIndex).replace(/^[\\s:]+/, '');\n    let endIndex = sectionText.length;\n    if (endPattern) {\n      const endMatch = sectionText.match(endPattern);\n      if (endMatch) endIndex = endMatch.index;\n    }\n    const result = sectionText.substring(0, endIndex).trim();\n    return result === \"\" ? \"내용 없음\" : result;\n  }\n\n  let fact = extractSection(text, /1\\.\\s*사실관계/, /2\\.\\s*질의사항/);\n  let question = extractSection(text, /2\\.\\s*질의사항/, /3\\.\\s*(관련|관계)법령/);\n  const law = extractSection(text, /3\\.\\s*(관련|관계)법령/, /첨부파일/);\n\n  // 사실관계/질의사항이 비어있을 경우 예외 처리\n  if (fact === \"내용 없음\" && question === \"내용 없음\") {\n    let bodyText = text.substring(extractedTitle.length);\n    const lawMatch = bodyText.match(/3\\.\\s*(관련|관계)법령/);\n    const attachMatch = bodyText.match(/첨부파일/);\n    let cutIndex = bodyText.length;\n    if (lawMatch) cutIndex = lawMatch.index;\n    else if (attachMatch) cutIndex = attachMatch.index;\n    \n    bodyText = bodyText.substring(0, cutIndex);\n    const cleanedLines = bodyText.split('\\n').filter(line => {\n      const trimmed = line.trim();\n      if (trimmed === \"\") return false;\n      if (trimmed.match(/^작성일\\s*\\d{4}\\.\\d{2}\\.\\d{2}/)) return false;\n      if (trimmed.match(/^※/)) return false;\n      return true;\n    });\n    question = cleanedLines.join('\\n').trim() || \"내용 없음\";\n  }\n\n  // 최종 결과 반환 (질의 작성일을 가장 위로 배치)\n  return {\n    json: {\n      content: {\n        \"질의 작성일\": inquiryDate, // 명칭 변경 완료\n        \"구분\": classification,\n        \"제목\": actualTitle,\n        \"1.사실관계\": fact,\n        \"2.질의사항\": question,\n        \"3.관련법령\": law\n      }\n    }\n  };\n}).filter(item => item !== null);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -624,
+        3136
+      ],
+      "id": "e02f31d0-31b7-46d9-a165-53ae9aab35c6",
+      "name": "Question Set Trimming"
+    },
+    {
+      "parameters": {
+        "url": "=http://175.45.201.89:5678/webhook/kasfo-detail",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "targetUrl",
+              "value": "=https://support.kasfo.or.kr{{ $json.url }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 4000
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1072,
+        3136
+      ],
+      "id": "6afd0c31-0a30-4984-a49a-6b10bef00770",
+      "name": "Today Question Set"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -400,
+        3136
+      ],
+      "id": "23bb522a-f281-41cd-8607-182749a51a37",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1872,
+        2272
+      ],
+      "id": "358718f7-21e1-4a48-a32c-21a3ec3fbaf3",
+      "name": "Wait1",
+      "webhookId": "3322479d-3e30-4c70-8c96-db33ab84e590"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        3520
+      ],
+      "id": "f990a6ea-1009-40b2-824f-4a67baec460a",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "z8rBhaL1qLwUbxwN",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const maxPages = 3; // 크롤링할 최대 페이지 수 (원하는 만큼 숫자 수정)\nconst results = [];\n\nfor (let i = 1; i <= maxPages; i++) {\n  results.push({ json: { pageNo: i } });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2192,
+        3136
+      ],
+      "id": "571dc884-7e13-4ce4-83e3-ccae5ca4259f",
+      "name": "Univ Page no."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const data = item.json;\n  const inputText = data.output || \"\"; \n\n  // 추출 시 앞부분의 콜론(:)과 공백을 제거하는 헬퍼 함수\n  const cleanText = (text) => {\n    return text ? text.trim().replace(/^[:\\s\\n\\r]+/, \"\").trim() : \"\";\n  };\n\n  // 1. 헤더 정보 추출\n  const dateMatch = inputText.match(/질의\\s*작성일\\s*:\\s*([\\d.]+)/);\n  const headerPart = inputText.split(\"제목\")[0]; \n  const categoryMatch = headerPart.match(/구분\\s*:\\s*([^\\n\\r]+)/);\n  const titleRegex = /제목\\s*:\\s*(.*)/;\n  \n  // 2. 질의 내용 추출\n  const questionContentRegex = /질의\\s*내용\\s*:\\s*([\\s\\S]*?)(?=1\\.\\s*질의\\s*요약|$)/;\n\n  // 3. 나머지 항목들 추출\n  const summaryRegex = /1\\.\\s*질의\\s*요약\\s*([\\s\\S]*?)(?=2\\.\\s*답변|$)/;\n  const answerRegex = /2\\.\\s*답변\\s*([\\s\\S]*?)(?=3\\.\\s*관련 법령|$)/;\n  const lawsRegex = /3\\.\\s*관련 법령\\s*([\\s\\S]*?)(?=4\\.\\s*유사 사례|$)/;\n  const casesRegex = /4\\.\\s*유사 사례\\s*([\\s\\S]*)/;\n\n  // 값 할당 및 정제 (cleanText 적용)\n  const date = dateMatch ? dateMatch[1].trim() : \"미지정\";\n  const category = categoryMatch ? categoryMatch[1].trim() : \"미지정\";\n  const title = (inputText.match(titleRegex)?.[1] || \"\").trim();\n  const questionContent = cleanText(inputText.match(questionContentRegex)?.[1]);\n  \n  const summary = cleanText(inputText.match(summaryRegex)?.[1]);\n  const answer = cleanText(inputText.match(answerRegex)?.[1]);\n  const laws = cleanText(inputText.match(lawsRegex)?.[1]);\n  const cases = cleanText(inputText.match(casesRegex)?.[1]);\n\n  // 컨텐츠 병합 (내용이 있는 것만)\n  const combinedContent = [\n    summary ? `[질문 요약]\\n${summary}` : \"\",\n    answer ? `[답변]\\n${answer}` : \"\",\n    laws ? `[관련 법령]\\n${laws}` : \"\",\n    cases ? `[유사 사례]\\n${cases}` : \"\"\n  ].filter(text => text !== \"\").join('\\n\\n');\n\n  return {\n    json: {\n      \"구분\": category,\n      \"질의작성일\": date,\n      \"제목\": title,\n      \"질의내용\": questionContent,\n      \"컨텐츠\": combinedContent\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        3296
+      ],
+      "id": "e83b5ec9-4509-4ca9-9fb5-b65687acdbb2",
+      "name": "Final Configure"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "12LrT-bscIuVrh4KADDm73Pdu5h8Ld829LAZYC_nqmHI",
+          "mode": "list",
+          "cachedResultName": "온라인상담 내부 검토 spreadsheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12LrT-bscIuVrh4KADDm73Pdu5h8Ld829LAZYC_nqmHI/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "시트1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12LrT-bscIuVrh4KADDm73Pdu5h8Ld829LAZYC_nqmHI/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "구분": "={{ $json['구분'] }}",
+            "질의작성일": "={{ $json['질의작성일'] }}",
+            "제목": "={{ $json['제목'] }}",
+            "AI 초안작성결과": "={{ $json['컨텐츠'] }}",
+            "답변기한": "={{ DateTime.fromFormat($json[\"질의작성일\"], \"yyyy.MM.dd\").plus({ days: 10 }).toFormat('yyyy.MM.dd') }}",
+            "순번": "==INDIRECT(\"R[-1]C\", FALSE) + 1",
+            "질의내용": "={{ $json[\"질의내용\"] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "순번",
+              "displayName": "순번",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "구분",
+              "displayName": "구분",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "질의작성일",
+              "displayName": "질의작성일",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "답변기한",
+              "displayName": "답변기한",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "제목",
+              "displayName": "제목",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "질의내용",
+              "displayName": "질의내용",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI 초안작성결과",
+              "displayName": "AI 초안작성결과",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "추가 검토 필요 여부(O)",
+              "displayName": "추가 검토 필요 여부(O)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "담당자 답변(이름 기재)",
+              "displayName": "담당자 답변(이름 기재)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "본부장님 자문",
+              "displayName": "본부장님 자문",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "검토의견",
+              "displayName": "검토의견",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        3296
+      ],
+      "id": "b53ecd15-7f8b-4d44-a480-d826f2de9b39",
+      "name": "Univ Append row",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6SQj2z13b0u9PR8s",
+          "name": "Google Sheets OAuth2_SB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=http://175.45.201.89:5678/webhook/kasfo-crawler?page={{ $json.pageNo }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 4000
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1968,
+        3136
+      ],
+      "id": "ba5b2190-d943-4698-9c5b-d60a6fb91bdf",
+      "name": "Website QnA List2"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2416,
+        3136
+      ],
+      "id": "2d8c1540-7a5e-4d76-a326-60f691cc3522",
+      "name": "Univ Every Morning 6si"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        192,
+        3504
+      ],
+      "id": "460379e7-1fe3-4f1c-9c7c-bfe77aec1e17",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "7jziSrXmnam0wmNA",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -160,
+        2800
+      ],
+      "id": "5fee9d33-8b10-4c02-b4b5-fa3206feac44",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "6Rrqctx2olyQCSPu",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=너는 사립대학 재무·회계 문서 검색을 위한 핵심어 추출기야.\n\n[분석 대상 질의]\n{{ JSON.stringify($json.content) }}\n\n[목표]\n분석 대상 질의에서 Supabase 하이브리드 검색에 사용할 핵심어와 보조어를 추출해.\n\n[추출 기준]\n\n1. core_keywords\n- 반드시 2~3개만 추출해.\n- 정답 문서를 찾기 위해 모두 함께 등장해야 하는 핵심 개념을 선택해.\n- 지출 대상, 거래·행위, 핵심 계정과목 또는 회계 쟁점을 우선해.\n- 질문에서 어느 하나를 선택하라고 제시한 대안 계정과목은 가능하면 보조어로 분류해.\n- 예: 내부인원 식사비의 계정과목을 묻는 경우\n  - 핵심어: 내부인원, 식사비\n  - 보조어: 교직원, 간담회, 복리후생비, 업무추진비\n\n2. optional_keywords\n- 3~6개를 추출해.\n- 핵심어의 동의어, 유사 표현, 관련 계정과목, 질문의 목적·상황을 포함해.\n- 핵심어와 동일한 단어를 중복해서 넣지 마.\n- 관련성이 낮은 단어로 개수를 억지로 채우지 마.\n\n3. 공통 기준\n- “대학”, “학교”, “회계”, “처리”, “문의”, “관련”, “규정”, “가능”처럼 지나치게 일반적인 단어는 제외해.\n- “내부인원”, “업무추진비”, “복리후생비” 같은 복합어는 쪼개지 말고 그대로 유지해.\n- 질문에 없는 사실, 결론, 법령명 또는 조항 번호를 임의로 만들지 마.\n- 핵심어 추출 단계에서 질문에 대한 답을 판단하지 마.\n- 원문의 질의 작성일, 구분, 제목, 사실관계, 질의사항은 수정하거나 요약하지 마.\n\n[출력 형식]\n설명, 마크다운, 코드블록 없이 유효한 JSON만 출력해.\n\n{\n  \"question\": {\n    \"질의 작성일\": \"원문 값\",\n    \"구분\": \"원문 값\",\n    \"제목\": \"원문 값\",\n    \"1.사실관계\": \"원문 값\",\n    \"2.질의사항\": \"원문 값\",\n    \"3.관련법령\": \"원문 값\"\n  },\n  \"core_keywords\": [\"핵심어1\", \"핵심어2\"],\n  \"optional_keywords\": [\"보조어1\", \"보조어2\", \"보조어3\"]\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -144,
+        2624
+      ],
+      "id": "e7c07b31-9a4c-4b56-bd82-316ef6e7a2aa",
+      "name": "Key Words Extract AI"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"question\": {\n    \"질의 작성일\": \"2026.08.18\",\n    \"구분\": \"교비회계[기타]\",\n    \"제목\": \"등록금회계 자금의 교육용 건물 활용\",\n    \"1.사실관계\": \"원문의 사실관계 전체\",\n    \"2.질의사항\": \"원문의 질의사항 전체\",\n    \"3.관련법령\": \"원문의 관련법령 전체\"\n  },\n  \"core_keywords\": [\n    \"등록금회계\",\n    \"교육용 건물\",\n    \"자금 이월\"\n  ],\n  \"optional_keywords\": [\n    \"건물 매입\",\n    \"건물 신축\",\n    \"적립금\",\n    \"건축적립금\",\n    \"교비회계\",\n    \"회계연도\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        32,
+        2832
+      ],
+      "id": "d98b8b98-81d3-49d5-97d2-9d37ba17879d",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "jsCode": "const extracted = typeof $json.output === 'string'\n  ? JSON.parse($json.output)\n  : ($json.output ?? $json);\nconst question = extracted.question ?? {};\nconst asText = (value) => typeof value === 'string' ? value.trim() : '';\nconst normalize = (value, maxLength) => [...new Set(\n  (Array.isArray(value) ? value : []).map(asText).filter(Boolean)\n)].slice(0, maxLength);\nconst questionText = [\n  ['제목', asText(question['제목'])],\n  ['사실관계', asText(question['1.사실관계'])],\n  ['질의사항', asText(question['2.질의사항'])],\n  ['관련법령', asText(question['3.관련법령'])],\n].filter(([, value]) => value).map(([label, value]) => `${label}: ${value}`).join('\\n');\nif (!questionText) throw new Error('검색할 원문 질의가 없습니다.');\nreturn [{ json: {\n  question,\n  core_keywords: normalize(extracted.core_keywords, 3),\n  optional_keywords: normalize(extracted.optional_keywords, 6),\n  question_text: questionText,\n  match_count: 20,\n  filter: {},\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        2272
+      ],
+      "id": "f62d011e-d813-4d87-b40a-a9be413d915e",
+      "name": "Prepare Hybrid Search"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: 'text-embedding-3-small', input: $json.question_text } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        304,
+        2272
+      ],
+      "id": "c2b49c33-8827-4159-8cf0-28a75c18b081",
+      "name": "OpenAI Query Embedding",
+      "credentials": {
+        "openAiApi": {
+          "id": "6Rrqctx2olyQCSPu",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prepared = $('Prepare Hybrid Search').item.json;\nconst embedding = $json.data?.[0]?.embedding;\nif (!Array.isArray(embedding) || embedding.length !== 1536) {\n  throw new Error('text-embedding-3-small 임베딩(1536차원)을 받지 못했습니다.');\n}\nreturn [{ json: { ...prepared, query_embedding: embedding } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        2272
+      ],
+      "id": "f317cf1a-03f6-4a3f-b18b-6f1fa3a88482",
+      "name": "Build Supabase V3 Payload"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ytmuaawteqdpagildyax.supabase.co/rest/v1/rpc/match_univ_documents_hybrid_v3",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { query_embedding: $json.query_embedding, query_text: $json.question_text, core_keywords: $json.core_keywords, optional_keywords: $json.optional_keywords, match_count: $json.match_count, filter: $json.filter } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        752,
+        2272
+      ],
+      "id": "14a54897-9abb-4b0f-99ed-4a24823047d6",
+      "name": "Supabase V3 RPC",
+      "credentials": {
+        "supabaseApi": {
+          "id": "cuI94cFv3pWMX3KE",
+          "name": "Hybrid Search for QnA"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const prepared = $('Prepare Hybrid Search').item.json;\nconst candidates = $input.all().flatMap((item) => {\n  if (Array.isArray(item.json)) return item.json;\n  if (Array.isArray(item.json.body)) return item.json.body;\n  return item.json?.id ? [item.json] : [];\n});\nif (candidates.length === 0) {\n  throw new Error('Supabase V3 검색 결과가 없습니다. RPC 입력과 필터를 확인하세요.');\n}\nreturn [{ json: {\n  ...prepared,\n  candidates,\n  documents: candidates.map((row) => row.content ?? ''),\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        2272
+      ],
+      "id": "a76134ea-f380-446e-9242-3cf215539c57",
+      "name": "Prepare Cohere Rerank"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cohere.com/v2/rerank",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cohereApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: 'rerank-v3.5', query: $json.question_text, documents: $json.documents, top_n: 7 } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1200,
+        2272
+      ],
+      "id": "7a589e2b-d082-4ce1-a0b4-fb600d7999cf",
+      "name": "Cohere Rerank HTTP",
+      "credentials": {
+        "cohereApi": {
+          "id": "4s5hGPZyhpSsiwDU",
+          "name": "CohereApi geminiyong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const search = $('Prepare Cohere Rerank').item.json;\nconst results = Array.isArray($json.results) ? $json.results : [];\nconst chunks = results.slice(0, 7).map(({ index, relevance_score }) => ({\n  ...search.candidates[index],\n  rerank_score: relevance_score,\n})).filter((row) => row.id !== undefined);\nreturn [{ json: {\n  question: search.question,\n  core_keywords: search.core_keywords,\n  optional_keywords: search.optional_keywords,\n  chunks,\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        2272
+      ],
+      "id": "442f4a99-379d-4832-aef9-a34271482d84",
+      "name": "Attach Reranked Chunks"
+    }
+  ],
+  "connections": {
+    "Final Trimming": {
+      "main": [
+        [
+          {
+            "node": "Final Configure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Answer": {
+      "main": [
+        [
+          {
+            "node": "Final Trimming",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Answer Generator": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase as AI Agent",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reranker Cohere": {
+      "ai_reranker": [
+        [
+          {
+            "node": "Supabase as AI Agent",
+            "type": "ai_reranker",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase as AI Agent": {},
+    "OpenAI Chat": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Draft Answer Generator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Today Question Only": {
+      "main": [
+        [
+          {
+            "node": "Today Question Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Set Extract": {
+      "main": [
+        [
+          {
+            "node": "List Set Configure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Set Configure": {
+      "main": [
+        [
+          {
+            "node": "Today Question Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Question Set Extract": {
+      "main": [
+        [
+          {
+            "node": "Question Set Trimming",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Question Set Trimming": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Today Question Set": {
+      "main": [
+        [
+          {
+            "node": "Question Set Extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "Select Answer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Key Words Extract AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Select Answer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Univ Page no.": {
+      "main": [
+        [
+          {
+            "node": "Website QnA List2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Configure": {
+      "main": [
+        [
+          {
+            "node": "Univ Append row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Univ Append row": {
+      "main": [
+        []
+      ]
+    },
+    "Website QnA List2": {
+      "main": [
+        [
+          {
+            "node": "List Set Extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Univ Every Morning 6si": {
+      "main": [
+        [
+          {
+            "node": "Univ Page no.",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Final Trimming",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Key Words Extract AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Key Words Extract AI": {
+      "main": [
+        [
+          {
+            "node": "Prepare Hybrid Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Key Words Extract AI",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Hybrid Search": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Query Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Query Embedding": {
+      "main": [
+        [
+          {
+            "node": "Build Supabase V3 Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Supabase V3 Payload": {
+      "main": [
+        [
+          {
+            "node": "Supabase V3 RPC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase V3 RPC": {
+      "main": [
+        [
+          {
+            "node": "Prepare Cohere Rerank",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Cohere Rerank": {
+      "main": [
+        [
+          {
+            "node": "Cohere Rerank HTTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cohere Rerank HTTP": {
+      "main": [
+        [
+          {
+            "node": "Attach Reranked Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Reranked Chunks": {
+      "main": [
+        [
+          {
+            "node": "Draft Answer Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fd103df1937e68fb57f6e5a1b6666e8f2ad6c296b1be539cf82bc2ee276faad8"
+  }
+}
