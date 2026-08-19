@@ -18,6 +18,37 @@ def load_pure_functions(*names):
 
 
 class RerankContextTests(unittest.TestCase):
+    def test_verification_prompt_rewrites_unsupported_exceptions(self):
+        verifier_factory = load_pure_functions("build_answer_verification_prompt").get(
+            "build_answer_verification_prompt"
+        )
+        self.assertIsNotNone(verifier_factory)
+
+        prompt = verifier_factory("SOURCE EVIDENCE", "DRAFT ANSWER")
+
+        self.assertIn("SOURCE EVIDENCE", prompt)
+        self.assertIn("DRAFT ANSWER", prompt)
+        self.assertIn("명시적 예외", prompt)
+        self.assertIn("다시 작성", prompt)
+        self.assertIn("가정이나 선택지", prompt)
+        self.assertIn("그 기준만 사용", prompt)
+
+    def test_explicit_rule_guardrails_prioritize_specific_mapping(self):
+        guardrail_factory = load_pure_functions("build_explicit_rule_guardrails").get(
+            "build_explicit_rule_guardrails"
+        )
+        self.assertIsNotNone(
+            guardrail_factory,
+            "build_explicit_rule_guardrails 함수가 필요해",
+        )
+
+        guardrails = guardrail_factory()
+
+        self.assertIn("대상·행위·계정과목", guardrails)
+        self.assertIn("일반적인 목적", guardrails)
+        self.assertIn("명시된 예외", guardrails)
+        self.assertIn("다른 계정과목의 가능성을 추가", guardrails)
+
     def test_rerank_passage_uses_child_text_not_parent_body(self):
         build_passage = load_pure_functions("build_rerank_passage").get("build_rerank_passage")
         self.assertIsNotNone(build_passage, "build_rerank_passage 함수가 필요해")

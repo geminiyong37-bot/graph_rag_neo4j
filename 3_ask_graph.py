@@ -119,6 +119,38 @@ def build_rerank_passage(row: dict) -> str:
 {row.get('child_text', '')}"""
 
 
+def build_explicit_rule_guardrails() -> str:
+    """구체 규정이 일반 설명에 의해 희석되지 않도록 답변 판정 순서를 고정한다."""
+    return """[규정 충돌 판정 순서]
+- 검색 근거에 특정 대상·행위·계정과목의 대응 관계가 직접 명시되어 있으면, 그 구체적인 대응 관계를 일반적인 목적·성격 설명보다 먼저 적용하세요.
+- 근거가 어떤 항목을 특정 계정과목으로 '처리한다', '처리하여야 한다' 또는 '처리하는 것이 적절하다'고 명시하면 이를 최종 결론으로 사용하세요.
+- 같은 근거에 명시된 예외가 없는 한, 질문에 포함된 부수적인 목적이나 명칭을 이유로 다른 계정과목의 가능성을 추가하지 마세요.
+- 일반 정의, 포괄적인 사례 또는 업무 관련성 설명은 위 구체 규정이 직접 다루지 않는 사안에만 보충적으로 사용하세요."""
+
+
+def build_answer_verification_prompt(evidence: str, draft_answer: str) -> str:
+    """생성된 답변이 검색 근거에 없는 조건이나 예외를 덧붙였는지 검증한다."""
+    return f"""너는 사학기관 회계 답변의 최종 근거 검증자입니다.
+
+[검증 원칙]
+- 아래 근거에 대상·행위·계정과목의 관계가 명시되어 있으면 그 관계를 최우선 결론으로 적용하세요.
+- 초안이 질문의 전제, 일반 회계 상식, 목적 또는 업무 관련성을 이유로 근거에 없는 선택지나 예외를 추가했는지 확인하세요.
+- 다른 처리가 가능하다고 쓰려면 아래 근거에 그 명시적 예외가 있어야 합니다.
+- 질문에 포함된 가정이나 선택지를 사실인 것처럼 첫 문장 또는 결론에 반복하지 마세요.
+- 근거가 하나의 분류 기준을 명시하면 그 기준만 사용하고, 다른 포괄적 기준을 첫 문장·설명·결론 어디에도 남기지 마세요.
+- 충돌이나 근거 없는 확대 해석이 하나라도 있으면 해당 내용을 제거하고 답변 전체를 다시 작성하세요.
+- 문제가 없더라도 초안만 그대로 승인한다고 말하지 말고, 사용자에게 전달할 최종 답변만 출력하세요.
+- 법령명·조항 번호도 아래 근거에 실제로 적힌 것만 사용하세요.
+
+[검색 근거]
+{evidence}
+
+[검증할 초안]
+{draft_answer}
+
+[근거 검증을 마친 최종 답변]"""
+
+
 def group_chunks_by_parent(rows: list[dict]) -> tuple[dict, list[str]]:
     """선택된 자식 근거를 보존하면서 동일한 부모 본문을 한 번만 묶는다."""
     parent_map = {}
@@ -352,6 +384,7 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
         display_idx += 1
 
     full_context = "\n----------------------------------------\n".join(context_blocks)
+    explicit_rule_guardrails = build_explicit_rule_guardrails()
 
     priority_instruction = ""
     if is_school_or_foundation:
@@ -368,6 +401,8 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
 2. [지식 그래프 정밀 연관망]: 핵심 개체, 법률 조항, 계정과목, 예외 규정, 절차 간의 1-Hop 구조적 연관 관계망
 
 답변 작성 지침 (엄격 적용):
+{explicit_rule_guardrails}
+
 1. [출처 파일 태그 인식 및 위계 적용]:
    - 출처 파일명에 `[최우선]`이 포함된 문서: 법적·행정적 최고 권위를 갖는 지침이므로, 명시된 내용이 있다면 **최우선 정답 절대 기준**으로 삼으세요.
    - 출처 파일명에 `[참고용]`이 포함된 문서: 보조 가이드라인 또는 범용 회계기준이므로, 상위 규정에 직접적인 언급이 없거나 보완이 필요한 경우에 한해 **가장 마지막 보충 참고용**으로만 활용하세요.
@@ -392,7 +427,13 @@ def hybrid_search_and_answer(question: str, top_k: int = 5, category: str = "") 
         {"role": "user", "content": user_prompt}
     ])
 
-    return response.content
+    verification_prompt = build_answer_verification_prompt(full_context, response.content)
+    verified_response = llm.invoke([
+        {"role": "system", "content": "검색 근거만으로 회계 답변의 충돌과 과잉 해석을 교정하세요."},
+        {"role": "user", "content": verification_prompt},
+    ])
+
+    return verified_response.content
 
 
 if __name__ == "__main__":
