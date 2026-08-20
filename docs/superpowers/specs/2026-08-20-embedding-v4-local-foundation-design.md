@@ -32,6 +32,7 @@ embedding_v4/
   chunker.py
   manifest.py
   aliases.yaml
+  search_terms.yaml
 tests/
   test_embedding_v4_models.py
   test_embedding_v4_ids.py
@@ -40,7 +41,7 @@ tests/
   test_embedding_v4_manifest.py
 ```
 
-`aliases.yaml`은 코드와 분리된 버전 관리 대상이다. 프로젝트에 Pydantic 2와 PyYAML이 이미 있으므로 새 의존성은 추가하지 않는다.
+`aliases.yaml`과 `search_terms.yaml`은 코드와 분리된 버전 관리 대상이다. 프로젝트에 Pydantic 2와 PyYAML이 이미 있으므로 새 의존성은 추가하지 않는다.
 
 ## 4. 데이터 계약
 
@@ -162,7 +163,17 @@ Entity는 `entity_id`, `entity_type`, `canonical_name`, `aliases`, `normalizatio
 
 별칭 사전은 유형별 `canonical_name`과 `aliases`를 담고 `normalization_version`으로 추적한다. 법령명·약칭, 기관명, 계정과목, 절차, 비용 항목의 띄어쓰기·약칭·복수 표현을 포함한다.
 
-검색 키워드도 동일한 기본 문자열 정규화를 사용하되 Entity 병합과는 분리한다. 핵심·선택 키워드는 안전한 표준형과 검증된 검색 별칭을 확장할 수 있지만, 그 결과가 Entity 동일성을 자동 확정하지는 않는다.
+적용 대상은 다음처럼 구분한다.
+
+| 대상 | 적용 시점 | 적용 내용 | 금지 사항 |
+|---|---|---|---|
+| Entity | Fact·Entity 추출 후 | 검증된 별칭을 `canonical_name`에 연결하고 Entity ID 생성 | 검색 확장어만으로 자동 병합 금지 |
+| 핵심어 | 질문 분석 시 | 질문의 필수 개념을 안전한 표준형과 검증된 표기 별칭으로 정리 | 의미가 넓어지는 관련어 추가 금지 |
+| 확장어 | 검색 후보 생성 시 | 동의어·관련 표현을 추가하고 핵심어보다 낮은 가중치로 검색 | Entity 동일성 확정과 원문 변경 금지 |
+
+Entity 별칭은 “같은 개념”임이 검증된 표현만 `aliases.yaml`에 둔다. 핵심어·확장어 규칙은 별도 `search_terms.yaml`에 두어 Entity 병합 규칙과 섞지 않는다. 예를 들어 `업무 추진비`는 검증 후 `업무추진비`의 Entity 별칭이 될 수 있지만, 관련 표현인 `업무추진경비`는 검색 확장어로만 사용할 수 있으며 같은 Entity라고 단정하지 않는다.
+
+질문 원문은 보존한다. 검색 실행 기록에는 원문 질문, 정규화된 핵심어, 추가된 확장어, 각 확장 규칙과 사전 버전을 남겨 같은 검색을 재현할 수 있게 한다. 원문 `content`, `source_span`, Fact `statement`는 키워드 표준화로 변경하지 않는다.
 
 ## 7. 의미 단위 청킹
 
@@ -242,6 +253,8 @@ Markdown 입력
 - 일반 본문 Chunk 사이의 고정 글자 오버랩은 없다.
 - 검증된 띄어쓰기·약칭·복수 표현은 같은 Entity로 연결된다.
 - 유형이 다르거나 유사도만 높은 표현은 자동 병합되지 않는다.
+- 핵심어에는 안전한 표기 별칭만 적용되고 확장어는 별도 낮은 가중치로 생성된다.
+- 검색 확장어가 Entity 자동 병합이나 원문 변경에 사용되지 않는다.
 - 원문 `surface`와 `source_span`은 그대로 보존된다.
 - 동일 체크섬·버전은 건너뛰고 변경된 입력이나 버전만 다시 처리한다.
 
