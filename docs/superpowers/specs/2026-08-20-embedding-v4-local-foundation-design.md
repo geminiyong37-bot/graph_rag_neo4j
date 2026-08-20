@@ -109,9 +109,25 @@ Fact는 원문에 근거한 하나의 독립 판단·규칙·의무·허용·금
 - 필수 predicate 또는 원문 근거가 없으면 유효성 검사에서 거부한다.
 - `statement`는 의미가 변할 수 있으므로 공격적으로 표준화하지 않는다.
 
-초기 predicate 목록은 `CLASSIFIED_AS`, `APPLIES_TO`, `GOVERNS`, `REQUIRES`, `PERMITS`, `PROHIBITS`, `INCLUDES`, `EXCLUDES`, `EXCEPTS`, `RESULTS_IN`, `DEDUCTIBLE_AS`, `REQUIRES_APPROVAL`, `REQUIRES_REPORTING`, `RELATED_TO`로 제한한다.
+초기 predicate 목록은 `CLASSIFIED_AS`, `APPLIES_TO`, `GOVERNS`, `REQUIRES`, `PERMITS`, `PROHIBITS`, `INCLUDES`, `EXCLUDES`, `EXCEPTS`, `RESULTS_IN`, `DEDUCTIBLE_AS`, `REQUIRES_APPROVAL`, `REQUIRES_REPORTING`, `RELATED_TO`로 제한한다. 이는 최종 고정 목록이 아니라 표본 테스트를 위한 버전 1 목록이다.
 
-### 4.4 Entity
+허용 목록으로 표현하기 어려운 관계가 나오면 `RELATED_TO`로 억지 변환하거나 새 predicate를 즉시 생성하지 않는다. 원문, 제안 predicate, 기존 목록으로 표현할 수 없는 이유, 발생 횟수를 `predicate_candidates.jsonl`에 기록한다. 표본 Fact 검토가 끝난 뒤 반복성과 검색 가치를 확인해 사용자가 승인한 항목만 목록에 추가하고 `predicate_version`을 올린다. 단순 표현 차이는 새 predicate를 만들지 않고 기존 predicate로 통합한다.
+
+초기 표본 테스트에서는 특히 정의, 계산 방식, 자격·대상 여부, 제출·신고, 기한·시행 관계가 기존 목록으로 충분히 표현되는지 확인한다.
+
+### 4.4 검토 대상과 승인 흐름
+
+`subject`가 없는 Fact란 판단 문장은 발견했지만 무엇에 대한 판단인지 원문 구간만으로 확정할 수 없는 경우다. 예를 들어 표의 병합 셀, 앞 행을 이어받는 표현, “사전 승인을 받아야 한다”처럼 주체가 생략된 문장이 해당한다. AI가 주체를 추측해 잘못된 Entity 관계를 만드는 대신 Fact 후보와 원문 근거를 보존한다.
+
+검토자는 프로젝트 사용자 또는 사용자가 지정한 운영자다. AI와 코드는 검토 자료를 만들지만 최종 확정은 하지 않는다. 검토는 표본 Fact 추출 후, Neo4j 표본 적재 전에 수행한다.
+
+1. 시스템이 `review_required.jsonl`과 사람이 읽을 수 있는 요약 보고서를 생성한다.
+2. 검토자는 원문 Chunk와 앞뒤 Chunk를 보고 subject를 확정하거나 Fact를 제외한다.
+3. 승인된 수정에는 검토자, 검토 시각, 결정 사유를 기록한다.
+4. 미해결 항목은 원문 검색용 후보로만 남기고 Neo4j Entity 관계와 전체 적재에서 제외한다.
+5. Predicate 후보도 같은 검토 시점에 승인·기각·보류로 분류한다.
+
+### 4.5 Entity
 
 Entity는 여러 Fact에서 재사용되는 표준 개념이다. 법령뿐 아니라 기관, 계정과목, 절차, 비용 항목, 역할과 시스템도 표준화한다.
 
@@ -210,6 +226,8 @@ Markdown 입력
 - Pydantic 모델이 유효 입력을 받고 필수 근거가 없는 Fact를 거부한다.
 - 조건부 필드마다 값 또는 `field_assessments` 상태 중 정확히 하나가 있어야 한다.
 - `REVIEW_REQUIRED` 항목이 있는 Fact는 검토 대상으로 표시되고 자동 관계 생성에서 제외된다.
+- 허용되지 않은 관계는 `predicate_candidates.jsonl`에 기록되고 자동으로 `RELATED_TO`로 바뀌지 않는다.
+- 승인된 Predicate 변경은 `predicate_version` 상승 없이는 적용되지 않는다.
 - 같은 입력에서 Document·Chunk·Fact·Entity ID와 체크섬이 반복 실행마다 같다.
 - 제목 경로와 앞뒤 Chunk 연결이 정확하다.
 - 일반 Chunk는 목표 범위를 우선하고 예외 없이 1,500자를 넘지 않는다.
