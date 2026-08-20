@@ -131,7 +131,9 @@ Fact는 원문에 근거한 하나의 독립 판단·규칙·의무·허용·금
 
 Entity는 여러 Fact에서 재사용되는 표준 개념이다. 법령뿐 아니라 기관, 계정과목, 절차, 비용 항목, 역할과 시스템도 표준화한다.
 
-초기 유형은 `Organization`, `Regulation`, `Article`, `Account`, `Procedure`, `Concept`, `PersonRole`, `System`, `ExpenseItem`, `Document`다. 조건과 예외 문구는 반복 검색 가치가 명확한 경우에만 Entity로 승격한다. 일반적인 조건·예외를 무조건 노드로 만들지 않는다.
+초기 유형은 `Organization`, `Regulation`, `Article`, `Account`, `Procedure`, `Concept`, `PersonRole`, `System`, `ExpenseItem`, `Document`다. 이는 최종 고정 목록이 아니라 표본 테스트를 위한 버전 1 목록이다. 조건과 예외 문구는 반복 검색 가치가 명확한 경우에만 Entity로 승격한다. 일반적인 조건·예외를 무조건 노드로 만들지 않는다.
+
+초기 유형으로 정확히 표현하기 어려운 Entity는 `Concept`에 억지로 넣거나 새 유형을 즉시 생성하지 않는다. 원문 표현, 제안 유형, 기존 유형으로 표현할 수 없는 이유, 발생 횟수를 `entity_type_candidates.jsonl`에 기록한다. 표본 Entity 검토가 끝난 뒤 서로 구분할 검색 가치와 반복성이 확인되고 사용자가 승인한 유형만 추가하며 `entity_type_version`을 올린다. 이름만 다른 동일 개념은 새 유형이 아니라 기존 유형의 별칭으로 처리한다.
 
 Entity는 `entity_id`, `entity_type`, `canonical_name`, `aliases`, `normalization_version`을 가진다. 원문 표현은 Fact의 subject/object에 `surface`로 별도 보존한다.
 
@@ -228,6 +230,8 @@ Markdown 입력
 - `REVIEW_REQUIRED` 항목이 있는 Fact는 검토 대상으로 표시되고 자동 관계 생성에서 제외된다.
 - 허용되지 않은 관계는 `predicate_candidates.jsonl`에 기록되고 자동으로 `RELATED_TO`로 바뀌지 않는다.
 - 승인된 Predicate 변경은 `predicate_version` 상승 없이는 적용되지 않는다.
+- 기존 유형으로 분류하기 어려운 Entity는 `entity_type_candidates.jsonl`에 기록되고 자동으로 `Concept`가 되지 않는다.
+- 승인된 Entity 유형 변경은 `entity_type_version` 상승 없이는 적용되지 않는다.
 - 같은 입력에서 Document·Chunk·Fact·Entity ID와 체크섬이 반복 실행마다 같다.
 - 제목 경로와 앞뒤 Chunk 연결이 정확하다.
 - 일반 Chunk는 목표 범위를 우선하고 예외 없이 1,500자를 넘지 않는다.

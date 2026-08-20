@@ -514,14 +514,16 @@ Regulation
 Article
 Account
 Procedure
-Condition
-Exception
 Concept
 PersonRole
 System
 ExpenseItem
 Document
 ```
+
+이 목록은 표본 테스트용 버전 1이며 최종 고정 목록이 아니다. 기존 유형으로 정확히 표현하기 어려운 Entity는 `Concept`에 억지로 넣거나 새 유형을 즉시 생성하지 않는다. 원문 표현, 제안 유형, 기존 유형으로 표현할 수 없는 이유, 발생 횟수를 `entity_type_candidates.jsonl`에 저장한다.
+
+표본 Entity 검토에서 반복성과 별도 검색 가치가 확인되고 사용자가 승인한 유형만 추가하며 `entity_type_version`을 올린다. 단순 명칭 차이는 새 유형으로 만들지 않고 기존 유형의 별칭으로 통합한다.
 
 ### 10.3 표준화 단계
 
@@ -1005,6 +1007,7 @@ Neo4j 장애 때문에 전체 상담 수집과 Supabase 기반 답변이 중단�
 - Entity alias 정규화
 - Entity 오병합 방지
 - Predicate 후보 수집, 중복 통합, 승인 및 `predicate_version` 변경
+- Entity 유형 후보 수집, 별칭 여부 검토, 승인 및 `entity_type_version` 변경
 - Subject 미확정 Fact의 검토 보고서와 적재 제외
 - 원본 Markdown 표와 임베딩용 `embedding_text` 분리 및 재현성
 - 공통 ID 생성
