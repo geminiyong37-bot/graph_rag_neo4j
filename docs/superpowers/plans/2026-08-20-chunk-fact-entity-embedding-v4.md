@@ -418,6 +418,10 @@ Fact 2: 판매부대비용 → 손금에 산입 가능
 
 ### 9.3 Fact 스키마
 
+항상 저장하는 핵심 필드는 `fact_id`, `statement`, `predicate`, `source_chunk_id`, `source_span`, `extractor_version`이다. `subject`, `object`, `conditions`, `exceptions`, `modality`, `result`, `legal_basis`, `effective_date`는 원문에 명확히 있거나 해당 Fact에 필요한 경우에만 저장한다. AI가 스스로 출력하는 `confidence`는 Fact 필드로 사용하지 않는다.
+
+조건부 필드를 작성하지 않았다면 `field_assessments`에 `NOT_STATED`, `NOT_APPLICABLE`, `REVIEW_REQUIRED` 중 하나를 기록한다. 값과 상태가 모두 없으면 실제 누락으로 거부한다. `REVIEW_REQUIRED`가 있거나 subject가 없는 Fact는 검토 후보로 보존하되 Entity 관계를 자동 생성하지 않는다.
+
 ```json
 {
   "fact_id": "..._f_01",
@@ -432,15 +436,16 @@ Fact 2: 판매부대비용 → 손금에 산입 가능
     "type": "Account"
   },
   "conditions": ["사전약정", "거래실적 기준"],
-  "exceptions": [],
   "modality": "PERMITTED",
   "result": "손금 산입 가능",
   "legal_basis": ["법인세법 제52조"],
-  "effective_date": null,
   "source_chunk_id": "..._ch_0032",
   "source_span": "원문에서 해당 판단을 직접 뒷받침하는 문장",
-  "confidence": 0.95,
-  "extractor_version": "fact-v1"
+  "extractor_version": "fact-v1",
+  "field_assessments": {
+    "exceptions": "NOT_STATED",
+    "effective_date": "NOT_STATED"
+  }
 }
 ```
 
@@ -472,12 +477,14 @@ LLM이 새로운 관계명을 임의로 생성하지 않도록 한다. 목록에
 다음 Fact는 적재하지 않는다.
 
 - `source_span`이 원문에 존재하지 않음
-- Subject 또는 핵심 판단이 없음
+- 핵심 판단이 없음
+- 조건부 필드의 값과 `field_assessments` 상태가 모두 없음
 - 원문에 없는 법령·조항을 생성함
 - 조건이나 예외를 제거해 의미가 반대로 바뀜
 - 단순 주제어 나열
 - 동일 Chunk 안에서 완전히 중복됨
-- 신뢰도가 설정 기준 미만임
+
+Subject가 없거나 `REVIEW_REQUIRED`가 있는 Fact는 삭제하지 않고 검토 목록에 두며, 검토 완료 전 Entity 관계를 만들지 않는다.
 
 ---
 
@@ -601,9 +608,9 @@ conditions_json
 exceptions_json
 modality
 result
+field_assessments_json
 source_span
 source_chunk_id
-confidence
 embedding
 embedding_model
 extractor_version
@@ -644,7 +651,6 @@ normalization_version
 ```text
 fact_id
 source_chunk_id
-confidence
 predicate_version
 ```
 
@@ -766,6 +772,8 @@ Chunk와 Fact는 같은 모델을 사용할 수 있지만 서로 다른 벡터 �
 
 - Fact 하나에 핵심 판단 하나만 있는가
 - 조건과 예외가 보존되는가
+- 조건부 항목마다 값 또는 미작성 이유가 존재하는가
+- `REVIEW_REQUIRED` Fact가 자동 관계 생성에서 제외되는가
 - `source_span`이 원문에 실제로 존재하는가
 - 원문에 없는 법령과 결론을 만들지 않았는가
 - 너무 일반적인 `RELATED_TO`가 과다하지 않은가

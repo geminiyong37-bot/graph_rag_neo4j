@@ -72,12 +72,41 @@ Chunk는 검색과 근거 복원을 위한 원문 단위다. 최소 필드는 �
 
 Fact는 원문에 근거한 하나의 독립 판단·규칙·의무·허용·금지·분류·예외다. 검색용 Chunk와 재사용 개념인 Entity 사이에서 “무엇이 어떤 조건으로 성립하는가”를 보존한다.
 
-필수 항목은 `fact_id`, `statement`, `subject`, `predicate`, `source_chunk_id`, `source_span`, `extractor_version`이다. 선택 항목은 `object`, `conditions`, `exceptions`, `modality`, `result`, `legal_basis`, `effective_date`, `confidence`다.
+항상 저장하는 핵심 항목은 `fact_id`, `statement`, `predicate`, `source_chunk_id`, `source_span`, `extractor_version`이다. `subject`, `object`, `conditions`, `exceptions`, `modality`, `result`, `legal_basis`, `effective_date`는 원문에 명확히 존재하거나 해당 Fact에 필요한 경우에만 저장한다. AI가 스스로 매기는 `confidence`는 정확성 보장이 약하므로 Fact 필드에서 제외한다.
+
+조건부 항목을 작성하지 않았을 때는 `field_assessments`에 그 이유를 반드시 기록한다.
+
+- `NOT_STATED`: 원문에 해당 정보가 없음
+- `NOT_APPLICABLE`: 이 Fact에는 해당 항목이 필요하지 않음
+- `REVIEW_REQUIRED`: 원문이 모호해 자동 결정하지 못함
+
+값이 있는 항목은 `field_assessments`에 중복 기록하지 않는다. 조건부 항목에 값도 없고 상태도 없으면 의도적인 공란이 아닌 실제 누락으로 간주해 검증에서 거부한다. `subject`가 없으면 Fact 후보 자체는 보존할 수 있지만 Entity 관계를 만들지 않고 반드시 검토 대상으로 보낸다.
+
+```json
+{
+  "fact_id": "..._f_01",
+  "statement": "업무추진비의 교비회계 집행에는 사전 승인이 필요하다.",
+  "predicate": "REQUIRES_APPROVAL",
+  "subject": {"surface": "업무추진비", "type": "ExpenseItem"},
+  "conditions": ["교비회계에서 집행하는 경우"],
+  "source_chunk_id": "..._ch_0012",
+  "source_span": "업무추진비를 교비회계에서 집행하려면 사전에 승인을 받아야 한다.",
+  "extractor_version": "fact-v1",
+  "field_assessments": {
+    "object": "NOT_APPLICABLE",
+    "exceptions": "NOT_STATED",
+    "modality": "NOT_APPLICABLE",
+    "result": "NOT_STATED",
+    "legal_basis": "NOT_STATED",
+    "effective_date": "NOT_STATED"
+  }
+}
+```
 
 - Fact 하나에는 통제된 predicate 하나만 둔다.
 - `source_span`은 원문의 연속 구간이어야 하며 표준화하거나 고쳐 쓰지 않는다.
 - 조건과 예외는 기본적으로 Fact의 속성으로 둔다.
-- 필수 주체, predicate 또는 원문 근거가 없으면 유효성 검사에서 거부한다.
+- 필수 predicate 또는 원문 근거가 없으면 유효성 검사에서 거부한다.
 - `statement`는 의미가 변할 수 있으므로 공격적으로 표준화하지 않는다.
 
 초기 predicate 목록은 `CLASSIFIED_AS`, `APPLIES_TO`, `GOVERNS`, `REQUIRES`, `PERMITS`, `PROHIBITS`, `INCLUDES`, `EXCLUDES`, `EXCEPTS`, `RESULTS_IN`, `DEDUCTIBLE_AS`, `REQUIRES_APPROVAL`, `REQUIRES_REPORTING`, `RELATED_TO`로 제한한다.
@@ -168,7 +197,7 @@ Markdown 입력
 
 이번 단계는 Fact를 LLM으로 추출하지 않는다. 대신 이후 추출기가 반환해야 할 입력·출력 계약과 검증기를 만든다.
 
-- 필수 필드 누락과 허용되지 않은 predicate는 명확한 검증 오류로 반환한다.
+- 핵심 필드 누락, 조건부 필드의 값·상태 동시 누락, 허용되지 않은 predicate는 명확한 검증 오류로 반환한다.
 - `source_span`이 원문 Chunk에 없으면 Fact를 거부한다.
 - 1,500자 초과, 빈 Chunk, 행이 중복된 분할 표는 청킹 오류로 반환한다.
 - 별칭 사전에서 같은 유형·같은 alias가 서로 다른 표준명에 연결되면 시작 시 설정 오류로 중단한다.
@@ -179,6 +208,8 @@ Markdown 입력
 단위 테스트는 외부 네트워크나 데이터베이스 없이 실행되어야 한다.
 
 - Pydantic 모델이 유효 입력을 받고 필수 근거가 없는 Fact를 거부한다.
+- 조건부 필드마다 값 또는 `field_assessments` 상태 중 정확히 하나가 있어야 한다.
+- `REVIEW_REQUIRED` 항목이 있는 Fact는 검토 대상으로 표시되고 자동 관계 생성에서 제외된다.
 - 같은 입력에서 Document·Chunk·Fact·Entity ID와 체크섬이 반복 실행마다 같다.
 - 제목 경로와 앞뒤 Chunk 연결이 정확하다.
 - 일반 Chunk는 목표 범위를 우선하고 예외 없이 1,500자를 넘지 않는다.
