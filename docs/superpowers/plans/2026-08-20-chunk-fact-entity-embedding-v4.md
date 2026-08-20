@@ -320,6 +320,8 @@ source_path          text
 content_checksum     text
 parser_version       text
 chunker_version      text
+embedding_model      text
+embedding_version    text
 created_at           timestamptz
 updated_at           timestamptz
 ```
@@ -337,20 +339,18 @@ embedding            vector(1536)
 heading_path         text
 previous_chunk_id    text null
 next_chunk_id        text null
-document_type        text
-file_name            text
-year                 integer
 content_checksum     text
-embedding_model      text
-embedding_version    text
-metadata             jsonb
 ```
+
+문서 공통값인 `document_type`, `file_name`, `year`와 처리·임베딩 버전은 Chunk마다 반복하지 않고 `document_id`로 Document 테이블에서 조회한다. Chunk에는 원문 검색, 연결, 무결성 확인에 필요한 값만 둔다.
+
+임베딩 모델에 전달하는 텍스트는 원칙적으로 `content`만 사용한다. 본문이 제목에 의존하는 경우에만 `heading_path`를 함께 사용하며, ID·파일명·연도·체크섬·버전 정보는 임베딩하지 않는다.
 
 ### 8.3 검색 인덱스
 
 - Chunk embedding cosine/vector index
 - 한국어 FTS에 사용하는 `fts` 컬럼과 GIN 인덱스
-- `document_type`, `year`, `document_id` 필터 인덱스
+- Chunk의 `document_id` 인덱스와 Document의 `document_type`, `year` 필터 인덱스
 - 기존 V3 하이브리드 RPC가 새 Chunk 테이블을 대상으로 동작하도록 별도 버전으로 작성
 
 ### 8.4 기존 데이터 호환

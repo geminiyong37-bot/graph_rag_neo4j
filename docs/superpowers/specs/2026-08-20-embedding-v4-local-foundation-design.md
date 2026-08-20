@@ -44,20 +44,29 @@ tests/
 
 ## 4. 데이터 계약
 
-### 4.1 Chunk
+### 4.1 Document
+
+Document는 여러 Chunk가 공유하는 문서 정보와 처리 버전을 한 번만 보관한다.
+
+- `document_id`, `display_name`, `file_name`
+- `year`, `document_type`, `source_path`
+- `content_checksum`
+- `parser_version`, `chunker_version`
+
+### 4.2 Chunk
 
 Chunk는 검색과 근거 복원을 위한 원문 단위다. 최소 필드는 다음과 같다.
 
 - `chunk_id`, `document_id`, `chunk_index`
 - `content`, `content_checksum`
-- `heading_path`, `heading_level`
+- `heading_path`
 - `previous_chunk_id`, `next_chunk_id`
-- `document_type`, `file_name`, `year`
-- `parser_version`, `chunker_version`
 
-길이는 정규화된 `content` 본문만 센다. 제목 경로와 기타 메타데이터는 글자 수에서 제외한다.
+`document_type`, `file_name`, `year`, `parser_version`, `chunker_version`은 Chunk마다 반복하지 않고 `document_id`로 Document에서 찾는다. 길이는 정규화된 `content` 본문만 세며 제목 경로와 기타 메타데이터는 글자 수에서 제외한다.
 
-### 4.2 Fact
+실제 임베딩 입력은 원칙적으로 `content`만 사용한다. 본문 의미가 제목에 의존하는 경우에만 `heading_path`를 앞에 붙인다. ID, 파일명, 연도, 체크섬, 버전은 임베딩 입력에 포함하지 않는다.
+
+### 4.3 Fact
 
 Fact는 원문에 근거한 하나의 독립 판단·규칙·의무·허용·금지·분류·예외다. 검색용 Chunk와 재사용 개념인 Entity 사이에서 “무엇이 어떤 조건으로 성립하는가”를 보존한다.
 
@@ -71,7 +80,7 @@ Fact는 원문에 근거한 하나의 독립 판단·규칙·의무·허용·금
 
 초기 predicate 목록은 `CLASSIFIED_AS`, `APPLIES_TO`, `GOVERNS`, `REQUIRES`, `PERMITS`, `PROHIBITS`, `INCLUDES`, `EXCLUDES`, `EXCEPTS`, `RESULTS_IN`, `DEDUCTIBLE_AS`, `REQUIRES_APPROVAL`, `REQUIRES_REPORTING`, `RELATED_TO`로 제한한다.
 
-### 4.3 Entity
+### 4.4 Entity
 
 Entity는 여러 Fact에서 재사용되는 표준 개념이다. 법령뿐 아니라 기관, 계정과목, 절차, 비용 항목, 역할과 시스템도 표준화한다.
 
