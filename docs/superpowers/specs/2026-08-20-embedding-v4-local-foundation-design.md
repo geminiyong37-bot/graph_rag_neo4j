@@ -58,13 +58,15 @@ Document는 여러 Chunk가 공유하는 문서 정보와 처리 버전을 한 �
 Chunk는 검색과 근거 복원을 위한 원문 단위다. 최소 필드는 다음과 같다.
 
 - `chunk_id`, `document_id`, `chunk_index`
-- `content`, `content_checksum`
+- `content`, `embedding_text`, `content_checksum`
 - `heading_path`
 - `previous_chunk_id`, `next_chunk_id`
 
 `document_type`, `file_name`, `year`, `parser_version`, `chunker_version`은 Chunk마다 반복하지 않고 `document_id`로 Document에서 찾는다. 길이는 정규화된 `content` 본문만 세며 제목 경로와 기타 메타데이터는 글자 수에서 제외한다.
 
-실제 임베딩 입력은 원칙적으로 `content`만 사용한다. 본문 의미가 제목에 의존하는 경우에만 `heading_path`를 앞에 붙인다. ID, 파일명, 연도, 체크섬, 버전은 임베딩 입력에 포함하지 않는다.
+`content`에는 출처 표시와 Fact 근거 검증을 위한 원본 Markdown을 그대로 보존한다. `embedding_text`에는 실제 벡터 생성에 사용할 텍스트를 저장한다. 일반 본문은 `content`와 같게 두고, 표는 표 제목·열 헤더·행 값의 관계가 드러나는 문장형 텍스트로 변환한다. 본문 의미가 제목에 의존하는 경우에만 `heading_path`를 `embedding_text` 앞에 붙인다. ID, 파일명, 연도, 체크섬, 버전은 임베딩 입력에 포함하지 않는다.
+
+1단계에서는 두 값을 문서별 로컬 JSONL 결과 파일에 함께 저장해 사람이 원본과 변환 결과를 비교할 수 있게 한다. `content_checksum`은 변환문이 아닌 원본 `content`를 기준으로 계산한다. Supabase에 `embedding_text` 컬럼을 둘지는 표본 품질과 저장 용량을 확인한 후 후속 단계에서 결정한다.
 
 ### 4.3 Fact
 
@@ -182,6 +184,8 @@ Markdown 입력
 - 일반 Chunk는 목표 범위를 우선하고 예외 없이 1,500자를 넘지 않는다.
 - 질의·답변, 조건·결론, 법령 본문·단서를 분리하지 않는다.
 - 긴 표 분할 시 제목·헤더는 반복하고 데이터 행은 중복하지 않는다.
+- 로컬 JSONL에 원본 Markdown `content`와 재현 가능한 `embedding_text`가 함께 저장된다.
+- 표의 `embedding_text`가 제목·열 헤더·행 값의 관계를 보존하고 원본 `content`를 변경하지 않는다.
 - 일반 본문 Chunk 사이의 고정 글자 오버랩은 없다.
 - 검증된 띄어쓰기·약칭·복수 표현은 같은 Entity로 연결된다.
 - 유형이 다르거나 유사도만 높은 표현은 자동 병합되지 않는다.

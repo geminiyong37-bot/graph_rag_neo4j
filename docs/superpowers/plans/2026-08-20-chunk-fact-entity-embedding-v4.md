@@ -344,7 +344,9 @@ content_checksum     text
 
 문서 공통값인 `document_type`, `file_name`, `year`와 처리·임베딩 버전은 Chunk마다 반복하지 않고 `document_id`로 Document 테이블에서 조회한다. Chunk에는 원문 검색, 연결, 무결성 확인에 필요한 값만 둔다.
 
-임베딩 모델에 전달하는 텍스트는 원칙적으로 `content`만 사용한다. 본문이 제목에 의존하는 경우에만 `heading_path`를 함께 사용하며, ID·파일명·연도·체크섬·버전 정보는 임베딩하지 않는다.
+`content`에는 출처 표시와 Fact 근거 검증을 위한 원본 Markdown을 보존한다. 임베딩 모델에는 별도로 만든 `embedding_text`를 전달한다. 일반 본문은 원문과 같게 두고, 표는 표 제목·열 헤더·행 값의 관계가 드러나는 문장형 텍스트로 변환한다. 본문이 제목에 의존하는 경우에만 `heading_path`를 함께 사용하며, ID·파일명·연도·체크섬·버전 정보는 임베딩하지 않는다.
+
+1단계 로컬 검증에서는 문서별 JSONL 파일에 `content`와 `embedding_text`를 함께 저장하여 원본과 변환 결과를 비교한다. `content_checksum`은 원본 `content` 기준이다. Supabase에 `embedding_text`를 별도 컬럼으로 저장할지는 표본 검증 후 결정하며, 그 전에는 Chunk 테이블의 필수 필드로 확정하지 않는다.
 
 ### 8.3 검색 인덱스
 
@@ -988,6 +990,7 @@ Neo4j 장애 때문에 전체 상담 수집과 Supabase 기반 답변이 중단�
 - `source_span` 원문 검증
 - Entity alias 정규화
 - Entity 오병합 방지
+- 원본 Markdown 표와 임베딩용 `embedding_text` 분리 및 재현성
 - 공통 ID 생성
 - 재실행 체크포인트
 
