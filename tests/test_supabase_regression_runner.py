@@ -1,9 +1,12 @@
 import unittest
 
 from supabase.run_hybrid_regression import (
+    V2_FUNCTION,
+    V3_FUNCTION,
     build_rpc_payload,
     evaluate_result,
-    v2_has_regressed,
+    has_duplicate_ids,
+    has_regressed,
 )
 
 
@@ -36,24 +39,35 @@ class EvaluateResultTests(unittest.TestCase):
     def test_build_rpc_payload_uses_same_question_for_fts(self):
         case = {"question": "내부인원 식사비", "match_count": 20}
 
-        payload = build_rpc_payload([0.1, 0.2], case)
+        payload = build_rpc_payload([0.1, 0.2], case, V2_FUNCTION)
 
         self.assertEqual(payload["query_embedding"], [0.1, 0.2])
         self.assertEqual(payload["query_text"], "내부인원 식사비")
         self.assertEqual(payload["match_count"], 20)
         self.assertEqual(payload["filter"], {})
 
-    def test_detects_v2_regression_when_v1_passes_and_v2_fails(self):
+    def test_build_v3_payload_keeps_question_and_keywords(self):
+        case = {"question": "q", "core_keywords": ["a"], "optional_keywords": ["b"]}
+        payload = build_rpc_payload([0.1], case, V3_FUNCTION)
+        self.assertEqual(payload["query_text"], "q")
+        self.assertEqual(payload["core_keywords"], ["a"])
+        self.assertEqual(payload["optional_keywords"], ["b"])
+
+    def test_detects_duplicate_ids(self):
+        self.assertTrue(has_duplicate_ids([{"id": 7}, {"id": 7}]))
+        self.assertFalse(has_duplicate_ids([{"id": 7}, {"id": 8}]))
+
+    def test_detects_regression_when_baseline_passes_and_candidate_fails(self):
         self.assertTrue(
-            v2_has_regressed(
+            has_regressed(
                 {"passed": True, "rank": 3},
                 {"passed": False, "rank": None},
             )
         )
 
-    def test_does_not_flag_v2_when_both_versions_pass(self):
+    def test_does_not_flag_regression_when_both_versions_pass(self):
         self.assertFalse(
-            v2_has_regressed(
+            has_regressed(
                 {"passed": True, "rank": 3},
                 {"passed": True, "rank": 2},
             )

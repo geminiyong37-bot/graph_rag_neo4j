@@ -11,8 +11,8 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_CASES_PATH = Path(__file__).with_name("regression_cases.json")
-V1_FUNCTION = "match_univ_documents_hybrid"
 V2_FUNCTION = "match_univ_documents_hybrid_v2"
+V3_FUNCTION = "match_univ_documents_hybrid_v3"
 
 
 def evaluate_result(rows, expected_text, expected_filename):
@@ -28,23 +28,32 @@ def evaluate_result(rows, expected_text, expected_filename):
     return {"passed": False, "rank": None}
 
 
-def build_rpc_payload(embedding, case):
-    return {
+def build_rpc_payload(embedding, case, function_name):
+    payload = {
         "query_embedding": embedding,
         "match_count": case.get("match_count", 20),
         "filter": case.get("filter", {}),
         "query_text": case["question"],
     }
+    if function_name == V3_FUNCTION:
+        payload["core_keywords"] = case.get("core_keywords", [])
+        payload["optional_keywords"] = case.get("optional_keywords", [])
+    return payload
 
 
-def v2_has_regressed(v1_result, v2_result):
-    return v1_result["passed"] and not v2_result["passed"]
+def has_regressed(baseline_result, candidate_result):
+    return baseline_result["passed"] and not candidate_result["passed"]
+
+
+def has_duplicate_ids(rows):
+    ids = [row.get("id") for row in rows if row.get("id") is not None]
+    return len(ids) != len(set(ids))
 
 
 def call_rpc(base_url, api_key, function_name, embedding, case):
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/rest/v1/rpc/{function_name}",
-        data=json.dumps(build_rpc_payload(embedding, case)).encode("utf-8"),
+        data=json.dumps(build_rpc_payload(embedding, case, function_name)).encode("utf-8"),
         headers={
             "apikey": api_key,
             "Authorization": f"Bearer {api_key}",
@@ -84,24 +93,25 @@ def run_regression():
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
     failed = False
 
-    print("case\tV1\tV1 rank\tV2\tV2 rank\tseconds")
+    print("case\tV2\tV2 rank\tV3\tV3 rank\tV3 duplicate ids\tseconds")
     for case in cases:
         started = time.perf_counter()
         embedding = embeddings.embed_query(case["question"])
-        v1_rows = call_rpc(base_url, api_key, V1_FUNCTION, embedding, case)
         v2_rows = call_rpc(base_url, api_key, V2_FUNCTION, embedding, case)
-        v1_result = evaluate_result(
-            v1_rows, case["expected_text"], case.get("expected_filename", "")
-        )
+        v3_rows = call_rpc(base_url, api_key, V3_FUNCTION, embedding, case)
         v2_result = evaluate_result(
             v2_rows, case["expected_text"], case.get("expected_filename", "")
         )
+        v3_result = evaluate_result(
+            v3_rows, case["expected_text"], case.get("expected_filename", "")
+        )
+        duplicate_ids = has_duplicate_ids(v3_rows)
         elapsed = time.perf_counter() - started
         print(
-            f"{case['name']}\t{v1_result['passed']}\t{v1_result['rank']}\t"
-            f"{v2_result['passed']}\t{v2_result['rank']}\t{elapsed:.2f}"
+            f"{case['name']}\t{v2_result['passed']}\t{v2_result['rank']}\t"
+            f"{v3_result['passed']}\t{v3_result['rank']}\t{duplicate_ids}\t{elapsed:.2f}"
         )
-        if not v2_result["passed"] or v2_has_regressed(v1_result, v2_result):
+        if not v3_result["passed"] or has_regressed(v2_result, v3_result) or duplicate_ids:
             failed = True
 
     return 1 if failed else 0
