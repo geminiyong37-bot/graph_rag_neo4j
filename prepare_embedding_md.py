@@ -295,6 +295,9 @@ def main() -> int:
         encoding="utf-8",
         newline="\n",
     )
+    from merge_embedding_parts import merge_split_files
+
+    summary = merge_split_files(args.output)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0
 

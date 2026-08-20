@@ -1,7 +1,6 @@
 {
   "source_directory": "C:\\Graph Rag\\data",
   "output_directory": "C:\\Graph Rag\\data_embedding_ready",
-  "file_count": 57,
   "files": [
     {
       "filename": "[2000년] 사은품, 경품, 선물에 관련된 세무회계처리.md",
@@ -410,11 +409,11 @@
       }
     },
     {
-      "filename": "[2015년] 학교기업회계실무(1).md",
+      "filename": "[2015년] 학교기업회계실무.md",
       "year": 2015,
       "document_type": "accounting_reference",
       "source_sha256": "351c9d6695fb3e17b2ee0e28a3890517686bddc342ff6bd33a1f98d71621f4d4",
-      "output_sha256": "65ac31cfc5456a7759a8b5b954b39e6c58a26460c59c0ea09bc20b0794c3cca6",
+      "output_sha256": "d5fcbd5c568dc274d7e48315e0e751de1ef9db290b25904674aeb88c9cae2a6b",
       "changes": {
         "source_lines": 2675,
         "output_lines": 1755,
@@ -430,100 +429,137 @@
         "max_line_length": 665
       },
       "output_metrics": {
-        "characters": 93473,
-        "lines": 1760,
-        "headings": 122,
-        "table_rows": 1042,
-        "very_long_lines": 0,
-        "max_line_length": 897
-      }
-    },
-    {
-      "filename": "[2015년] 학교기업회계실무(2).md",
-      "year": 2015,
-      "document_type": "accounting_reference",
-      "source_sha256": "bbcb5d402d91382327e0bb55289b402941f86b6fbc568e9f207972b646373f9a",
-      "output_sha256": "14b74e48c55f4a3a95a7786ae4d192b23949f2943716bec7c8de99c98f321efa",
-      "changes": {
-        "source_lines": 3004,
-        "output_lines": 1792,
-        "normalized_headings": 13,
-        "removed_page_number_lines": 0
-      },
-      "source_metrics": {
-        "characters": 85547,
-        "lines": 3004,
-        "headings": 186,
-        "table_rows": 597,
-        "very_long_lines": 1,
-        "max_line_length": 1384
-      },
-      "output_metrics": {
-        "characters": 85569,
-        "lines": 1797,
-        "headings": 173,
-        "table_rows": 597,
+        "characters": 345545,
+        "lines": 7187,
+        "headings": 629,
+        "table_rows": 2902,
         "very_long_lines": 0,
         "max_line_length": 1100
-      }
-    },
-    {
-      "filename": "[2015년] 학교기업회계실무(3).md",
-      "year": 2015,
-      "document_type": "accounting_reference",
-      "source_sha256": "91041dc9426cec17c6bbed978e20042db10f5ee6609b65430234b7f473d86915",
-      "output_sha256": "49db7655bac32715f5db1ca4ffaf9ab6f2ef826329efbd511123fa61c4579d2c",
-      "changes": {
-        "source_lines": 3600,
-        "output_lines": 2490,
-        "normalized_headings": 10,
-        "removed_page_number_lines": 0
       },
-      "source_metrics": {
-        "characters": 103836,
-        "lines": 3600,
-        "headings": 193,
-        "table_rows": 1074,
-        "very_long_lines": 0,
-        "max_line_length": 583
-      },
-      "output_metrics": {
-        "characters": 103870,
-        "lines": 2495,
-        "headings": 184,
-        "table_rows": 1074,
-        "very_long_lines": 0,
-        "max_line_length": 885
-      }
-    },
-    {
-      "filename": "[2015년] 학교기업회계실무(4).md",
-      "year": 2015,
-      "document_type": "accounting_reference",
-      "source_sha256": "d02df5393429c42af2e16f4eb24b5c27b5bdc9b6bc4f3a3dae5b3ac60dbacdab",
-      "output_sha256": "cc6ab0e712dc517350f52af97d74ec4af8225a24f8445b5685fd32631f84283f",
-      "changes": {
-        "source_lines": 2303,
-        "output_lines": 1142,
-        "normalized_headings": 27,
-        "removed_page_number_lines": 0
-      },
-      "source_metrics": {
-        "characters": 62750,
-        "lines": 2303,
-        "headings": 159,
-        "table_rows": 172,
-        "very_long_lines": 0,
-        "max_line_length": 184
-      },
-      "output_metrics": {
-        "characters": 62798,
-        "lines": 1147,
-        "headings": 150,
-        "table_rows": 172,
-        "very_long_lines": 0,
-        "max_line_length": 899
-      }
+      "source_files": [
+        "[2015년] 학교기업회계실무(1).md",
+        "[2015년] 학교기업회계실무(2).md",
+        "[2015년] 학교기업회계실무(3).md",
+        "[2015년] 학교기업회계실무(4).md"
+      ],
+      "source_parts": [
+        {
+          "filename": "[2015년] 학교기업회계실무(1).md",
+          "year": 2015,
+          "document_type": "accounting_reference",
+          "source_sha256": "351c9d6695fb3e17b2ee0e28a3890517686bddc342ff6bd33a1f98d71621f4d4",
+          "output_sha256": "65ac31cfc5456a7759a8b5b954b39e6c58a26460c59c0ea09bc20b0794c3cca6",
+          "changes": {
+            "source_lines": 2675,
+            "output_lines": 1755,
+            "normalized_headings": 2,
+            "removed_page_number_lines": 0
+          },
+          "source_metrics": {
+            "characters": 93421,
+            "lines": 2675,
+            "headings": 124,
+            "table_rows": 1042,
+            "very_long_lines": 0,
+            "max_line_length": 665
+          },
+          "output_metrics": {
+            "characters": 93473,
+            "lines": 1760,
+            "headings": 122,
+            "table_rows": 1042,
+            "very_long_lines": 0,
+            "max_line_length": 897
+          }
+        },
+        {
+          "filename": "[2015년] 학교기업회계실무(2).md",
+          "year": 2015,
+          "document_type": "accounting_reference",
+          "source_sha256": "bbcb5d402d91382327e0bb55289b402941f86b6fbc568e9f207972b646373f9a",
+          "output_sha256": "14b74e48c55f4a3a95a7786ae4d192b23949f2943716bec7c8de99c98f321efa",
+          "changes": {
+            "source_lines": 3004,
+            "output_lines": 1792,
+            "normalized_headings": 13,
+            "removed_page_number_lines": 0
+          },
+          "source_metrics": {
+            "characters": 85547,
+            "lines": 3004,
+            "headings": 186,
+            "table_rows": 597,
+            "very_long_lines": 1,
+            "max_line_length": 1384
+          },
+          "output_metrics": {
+            "characters": 85569,
+            "lines": 1797,
+            "headings": 173,
+            "table_rows": 597,
+            "very_long_lines": 0,
+            "max_line_length": 1100
+          }
+        },
+        {
+          "filename": "[2015년] 학교기업회계실무(3).md",
+          "year": 2015,
+          "document_type": "accounting_reference",
+          "source_sha256": "91041dc9426cec17c6bbed978e20042db10f5ee6609b65430234b7f473d86915",
+          "output_sha256": "49db7655bac32715f5db1ca4ffaf9ab6f2ef826329efbd511123fa61c4579d2c",
+          "changes": {
+            "source_lines": 3600,
+            "output_lines": 2490,
+            "normalized_headings": 10,
+            "removed_page_number_lines": 0
+          },
+          "source_metrics": {
+            "characters": 103836,
+            "lines": 3600,
+            "headings": 193,
+            "table_rows": 1074,
+            "very_long_lines": 0,
+            "max_line_length": 583
+          },
+          "output_metrics": {
+            "characters": 103870,
+            "lines": 2495,
+            "headings": 184,
+            "table_rows": 1074,
+            "very_long_lines": 0,
+            "max_line_length": 885
+          }
+        },
+        {
+          "filename": "[2015년] 학교기업회계실무(4).md",
+          "year": 2015,
+          "document_type": "accounting_reference",
+          "source_sha256": "d02df5393429c42af2e16f4eb24b5c27b5bdc9b6bc4f3a3dae5b3ac60dbacdab",
+          "output_sha256": "cc6ab0e712dc517350f52af97d74ec4af8225a24f8445b5685fd32631f84283f",
+          "changes": {
+            "source_lines": 2303,
+            "output_lines": 1142,
+            "normalized_headings": 27,
+            "removed_page_number_lines": 0
+          },
+          "source_metrics": {
+            "characters": 62750,
+            "lines": 2303,
+            "headings": 159,
+            "table_rows": 172,
+            "very_long_lines": 0,
+            "max_line_length": 184
+          },
+          "output_metrics": {
+            "characters": 62798,
+            "lines": 1147,
+            "headings": 150,
+            "table_rows": 172,
+            "very_long_lines": 0,
+            "max_line_length": 899
+          }
+        }
+      ]
     },
     {
       "filename": "[2016년] 분교와 캠퍼스의 법적 지위 및 운영지위에 대한 법률자문 결과보고.md",
@@ -671,11 +707,11 @@
       }
     },
     {
-      "filename": "[2019년] 사학혁신위원회 활동백서(1).md",
+      "filename": "[2019년] 사학혁신위원회 활동백서.md",
       "year": 2019,
       "document_type": "reference",
       "source_sha256": "99b8a96f6a6ec0e495c5d86c7369f0f2cce286b74eb9cde8c307aae8b3ec3844",
-      "output_sha256": "19ee90f60b3532eac1364aa3499ab0d01fabf2ecc912175355c32acdec133345",
+      "output_sha256": "6930b319451b58a70754a114833f59e2102d3c46e4398f3235921790adbfb4fe",
       "changes": {
         "source_lines": 1517,
         "output_lines": 1002,
@@ -691,42 +727,77 @@
         "max_line_length": 64
       },
       "output_metrics": {
-        "characters": 48592,
-        "lines": 1007,
-        "headings": 35,
-        "table_rows": 25,
-        "very_long_lines": 0,
-        "max_line_length": 863
-      }
-    },
-    {
-      "filename": "[2019년] 사학혁신위원회 활동백서(2).md",
-      "year": 2019,
-      "document_type": "reference",
-      "source_sha256": "3657319abe2fbf856ba10b5b93fffb66ac4d97ef0ac62d8f0266270b5ee49ec5",
-      "output_sha256": "8655d9d7d8ed905696263d26e45ffc3b1085955c1b8614a59cbf1035798f12ac",
-      "changes": {
-        "source_lines": 2649,
-        "output_lines": 1571,
-        "normalized_headings": 18,
-        "removed_page_number_lines": 0
-      },
-      "source_metrics": {
-        "characters": 90955,
-        "lines": 2649,
-        "headings": 115,
-        "table_rows": 624,
-        "very_long_lines": 0,
-        "max_line_length": 377
-      },
-      "output_metrics": {
-        "characters": 90984,
-        "lines": 1576,
-        "headings": 98,
-        "table_rows": 630,
+        "characters": 139515,
+        "lines": 2579,
+        "headings": 133,
+        "table_rows": 683,
         "very_long_lines": 0,
         "max_line_length": 899
-      }
+      },
+      "source_files": [
+        "[2019년] 사학혁신위원회 활동백서(1).md",
+        "[2019년] 사학혁신위원회 활동백서(2).md"
+      ],
+      "source_parts": [
+        {
+          "filename": "[2019년] 사학혁신위원회 활동백서(1).md",
+          "year": 2019,
+          "document_type": "reference",
+          "source_sha256": "99b8a96f6a6ec0e495c5d86c7369f0f2cce286b74eb9cde8c307aae8b3ec3844",
+          "output_sha256": "19ee90f60b3532eac1364aa3499ab0d01fabf2ecc912175355c32acdec133345",
+          "changes": {
+            "source_lines": 1517,
+            "output_lines": 1002,
+            "normalized_headings": 24,
+            "removed_page_number_lines": 0
+          },
+          "source_metrics": {
+            "characters": 48650,
+            "lines": 1516,
+            "headings": 58,
+            "table_rows": 24,
+            "very_long_lines": 0,
+            "max_line_length": 64
+          },
+          "output_metrics": {
+            "characters": 48592,
+            "lines": 1007,
+            "headings": 35,
+            "table_rows": 25,
+            "very_long_lines": 0,
+            "max_line_length": 863
+          }
+        },
+        {
+          "filename": "[2019년] 사학혁신위원회 활동백서(2).md",
+          "year": 2019,
+          "document_type": "reference",
+          "source_sha256": "3657319abe2fbf856ba10b5b93fffb66ac4d97ef0ac62d8f0266270b5ee49ec5",
+          "output_sha256": "8655d9d7d8ed905696263d26e45ffc3b1085955c1b8614a59cbf1035798f12ac",
+          "changes": {
+            "source_lines": 2649,
+            "output_lines": 1571,
+            "normalized_headings": 18,
+            "removed_page_number_lines": 0
+          },
+          "source_metrics": {
+            "characters": 90955,
+            "lines": 2649,
+            "headings": 115,
+            "table_rows": 624,
+            "very_long_lines": 0,
+            "max_line_length": 377
+          },
+          "output_metrics": {
+            "characters": 90984,
+            "lines": 1576,
+            "headings": 98,
+            "table_rows": 630,
+            "very_long_lines": 0,
+            "max_line_length": 899
+          }
+        }
+      ]
     },
     {
       "filename": "[2019년] 학교법인_기부금영수증 발급 불가.md",
@@ -1454,11 +1525,11 @@
       }
     },
     {
-      "filename": "[2025년] 사학기관+회계기준+실무사례와+해설(한국공인회계사회)(1).md",
+      "filename": "[2025년] 사학기관+회계기준+실무사례와+해설(한국공인회계사회).md",
       "year": 2025,
       "document_type": "commentary",
       "source_sha256": "6f0848adc685fe8428ab76d308f6cbd81df9916a368175a8eaa0385a5421e6bc",
-      "output_sha256": "fe40f18b290d6323174dbe1f8a463527c4f79c808eb458ec219e0715586783f4",
+      "output_sha256": "2694f94cffea5ca4f357efa5bb4f6380cfc0186d3d1db1442c250e77a9b63a76",
       "changes": {
         "source_lines": 3184,
         "output_lines": 2403,
@@ -1474,78 +1545,114 @@
         "max_line_length": 563
       },
       "output_metrics": {
-        "characters": 103183,
-        "lines": 2408,
-        "headings": 169,
-        "table_rows": 764,
+        "characters": 247487,
+        "lines": 6025,
+        "headings": 506,
+        "table_rows": 1776,
         "very_long_lines": 0,
         "max_line_length": 899
-      }
+      },
+      "source_files": [
+        "[2025년] 사학기관+회계기준+실무사례와+해설(한국공인회계사회)(1).md",
+        "[2025년] 사학기관+회계기준+실무사례와+해설(한국공인회계사회)(2).md",
+        "[2025년] 사학기관+회계기준+실무사례와+해설(한국공인회계사회)(3).md"
+      ],
+      "source_parts": [
+        {
+          "filename": "[2025년] 사학기관+회계기준+실무사례와+해설(한국공인회계사회)(1).md",
+          "year": 2025,
+          "document_type": "commentary",
+          "source_sha256": "6f0848adc685fe8428ab76d308f6cbd81df9916a368175a8eaa0385a5421e6bc",
+          "output_sha256": "fe40f18b290d6323174dbe1f8a463527c4f79c808eb458ec219e0715586783f4",
+          "changes": {
+            "source_lines": 3184,
+            "output_lines": 2403,
+            "normalized_headings": 58,
+            "removed_page_number_lines": 0
+          },
+          "source_metrics": {
+            "characters": 103180,
+            "lines": 3184,
+            "headings": 216,
+            "table_rows": 764,
+            "very_long_lines": 0,
+            "max_line_length": 563
+          },
+          "output_metrics": {
+            "characters": 103183,
+            "lines": 2408,
+            "headings": 169,
+            "table_rows": 764,
+            "very_long_lines": 0,
+            "max_line_length": 899
+          }
+        },
+        {
+          "filename": "[2025년] 사학기관+회계기준+실무사례와+해설(한국공인회계사회)(2).md",
+          "year": 2025,
+          "document_type": "commentary",
+          "source_sha256": "e655d9fcafb736d57f9c6b1bfede2af0370d526ded7667c6597cb636ef8c41c5",
+          "output_sha256": "a4ff112126701246b557b465191fd96e6f0d5363f4221a1b59872d22911c3ea9",
+          "changes": {
+            "source_lines": 3241,
+            "output_lines": 2294,
+            "normalized_headings": 86,
+            "removed_page_number_lines": 0
+          },
+          "source_metrics": {
+            "characters": 101399,
+            "lines": 3241,
+            "headings": 301,
+            "table_rows": 434,
+            "very_long_lines": 0,
+            "max_line_length": 660
+          },
+          "output_metrics": {
+            "characters": 101363,
+            "lines": 2299,
+            "headings": 231,
+            "table_rows": 434,
+            "very_long_lines": 0,
+            "max_line_length": 872
+          }
+        },
+        {
+          "filename": "[2025년] 사학기관+회계기준+실무사례와+해설(한국공인회계사회)(3).md",
+          "year": 2025,
+          "document_type": "commentary",
+          "source_sha256": "597aeaf8fdf7b657e4f34713aa77233a66981bc8f6f0f50a3b0f09b950172ddd",
+          "output_sha256": "ee0546bf58b65131ad406f29ca469a308ea0b1345d0d5a2cff9feca655f7b8d7",
+          "changes": {
+            "source_lines": 1677,
+            "output_lines": 1321,
+            "normalized_headings": 11,
+            "removed_page_number_lines": 0
+          },
+          "source_metrics": {
+            "characters": 43026,
+            "lines": 1677,
+            "headings": 114,
+            "table_rows": 573,
+            "very_long_lines": 0,
+            "max_line_length": 343
+          },
+          "output_metrics": {
+            "characters": 43092,
+            "lines": 1326,
+            "headings": 106,
+            "table_rows": 573,
+            "very_long_lines": 0,
+            "max_line_length": 866
+          }
+        }
+      ]
     },
     {
-      "filename": "[2025년] 사학기관+회계기준+실무사례와+해설(한국공인회계사회)(2).md",
-      "year": 2025,
-      "document_type": "commentary",
-      "source_sha256": "e655d9fcafb736d57f9c6b1bfede2af0370d526ded7667c6597cb636ef8c41c5",
-      "output_sha256": "a4ff112126701246b557b465191fd96e6f0d5363f4221a1b59872d22911c3ea9",
-      "changes": {
-        "source_lines": 3241,
-        "output_lines": 2294,
-        "normalized_headings": 86,
-        "removed_page_number_lines": 0
-      },
-      "source_metrics": {
-        "characters": 101399,
-        "lines": 3241,
-        "headings": 301,
-        "table_rows": 434,
-        "very_long_lines": 0,
-        "max_line_length": 660
-      },
-      "output_metrics": {
-        "characters": 101363,
-        "lines": 2299,
-        "headings": 231,
-        "table_rows": 434,
-        "very_long_lines": 0,
-        "max_line_length": 872
-      }
-    },
-    {
-      "filename": "[2025년] 사학기관+회계기준+실무사례와+해설(한국공인회계사회)(3).md",
-      "year": 2025,
-      "document_type": "commentary",
-      "source_sha256": "597aeaf8fdf7b657e4f34713aa77233a66981bc8f6f0f50a3b0f09b950172ddd",
-      "output_sha256": "ee0546bf58b65131ad406f29ca469a308ea0b1345d0d5a2cff9feca655f7b8d7",
-      "changes": {
-        "source_lines": 1677,
-        "output_lines": 1321,
-        "normalized_headings": 11,
-        "removed_page_number_lines": 0
-      },
-      "source_metrics": {
-        "characters": 43026,
-        "lines": 1677,
-        "headings": 114,
-        "table_rows": 573,
-        "very_long_lines": 0,
-        "max_line_length": 343
-      },
-      "output_metrics": {
-        "characters": 43092,
-        "lines": 1326,
-        "headings": 106,
-        "table_rows": 573,
-        "very_long_lines": 0,
-        "max_line_length": 866
-      }
-    },
-    {
-      "filename": "[2026년] 공익법인 세무안내(1).md",
+      "filename": "[2026년] 공익법인 세무안내.md",
       "year": 2026,
       "document_type": "tax_guide",
       "source_sha256": "9a9e98dc070d9b9f41a2e0252a94336014dcc0304e4c60e776237d84c424c306",
-      "output_sha256": "2bf07795536185051ec2d2cdebcdd586af54f5cb844a8062a8e4c2ed2cee9f79",
+      "output_sha256": "2694808d1f4f393a991269a043fdd699159b21a3ac507225c5a8df841731fcd9",
       "changes": {
         "source_lines": 3111,
         "output_lines": 1967,
@@ -1561,71 +1668,107 @@
         "max_line_length": 2281
       },
       "output_metrics": {
-        "characters": 114370,
-        "lines": 1972,
-        "headings": 122,
-        "table_rows": 328,
-        "very_long_lines": 1,
+        "characters": 346478,
+        "lines": 6867,
+        "headings": 463,
+        "table_rows": 1591,
+        "very_long_lines": 2,
         "max_line_length": 2281
-      }
-    },
-    {
-      "filename": "[2026년] 공익법인 세무안내(2).md",
-      "year": 2026,
-      "document_type": "tax_guide",
-      "source_sha256": "6596c9f2353489b97610bc8de2b0c8484d966cca1f01718ccfd3ade5ee129be6",
-      "output_sha256": "dd9a21edd94c6396aa3695f2338898235ee86d6ab924b17c720da3838e9a9168",
-      "changes": {
-        "source_lines": 3262,
-        "output_lines": 1876,
-        "normalized_headings": 73,
-        "removed_page_number_lines": 0
       },
-      "source_metrics": {
-        "characters": 109255,
-        "lines": 3262,
-        "headings": 246,
-        "table_rows": 106,
-        "very_long_lines": 0,
-        "max_line_length": 413
-      },
-      "output_metrics": {
-        "characters": 109126,
-        "lines": 1881,
-        "headings": 173,
-        "table_rows": 106,
-        "very_long_lines": 0,
-        "max_line_length": 768
-      }
-    },
-    {
-      "filename": "[2026년] 공익법인 세무안내(3).md",
-      "year": 2026,
-      "document_type": "tax_guide",
-      "source_sha256": "9a6501fab33a70dbed6bf5ab59711f6b8706a999f780e26ff9a0ddff03796392",
-      "output_sha256": "02426db33614016ae7728c504775f7012e767b4484e302f8ac26f2378ee24f0b",
-      "changes": {
-        "source_lines": 3747,
-        "output_lines": 3017,
-        "normalized_headings": 50,
-        "removed_page_number_lines": 0
-      },
-      "source_metrics": {
-        "characters": 123201,
-        "lines": 3747,
-        "headings": 218,
-        "table_rows": 1136,
-        "very_long_lines": 1,
-        "max_line_length": 1526
-      },
-      "output_metrics": {
-        "characters": 123095,
-        "lines": 3022,
-        "headings": 168,
-        "table_rows": 1136,
-        "very_long_lines": 1,
-        "max_line_length": 1526
-      }
+      "source_files": [
+        "[2026년] 공익법인 세무안내(1).md",
+        "[2026년] 공익법인 세무안내(2).md",
+        "[2026년] 공익법인 세무안내(3).md"
+      ],
+      "source_parts": [
+        {
+          "filename": "[2026년] 공익법인 세무안내(1).md",
+          "year": 2026,
+          "document_type": "tax_guide",
+          "source_sha256": "9a9e98dc070d9b9f41a2e0252a94336014dcc0304e4c60e776237d84c424c306",
+          "output_sha256": "2bf07795536185051ec2d2cdebcdd586af54f5cb844a8062a8e4c2ed2cee9f79",
+          "changes": {
+            "source_lines": 3111,
+            "output_lines": 1967,
+            "normalized_headings": 38,
+            "removed_page_number_lines": 0
+          },
+          "source_metrics": {
+            "characters": 114401,
+            "lines": 3111,
+            "headings": 160,
+            "table_rows": 328,
+            "very_long_lines": 1,
+            "max_line_length": 2281
+          },
+          "output_metrics": {
+            "characters": 114370,
+            "lines": 1972,
+            "headings": 122,
+            "table_rows": 328,
+            "very_long_lines": 1,
+            "max_line_length": 2281
+          }
+        },
+        {
+          "filename": "[2026년] 공익법인 세무안내(2).md",
+          "year": 2026,
+          "document_type": "tax_guide",
+          "source_sha256": "6596c9f2353489b97610bc8de2b0c8484d966cca1f01718ccfd3ade5ee129be6",
+          "output_sha256": "dd9a21edd94c6396aa3695f2338898235ee86d6ab924b17c720da3838e9a9168",
+          "changes": {
+            "source_lines": 3262,
+            "output_lines": 1876,
+            "normalized_headings": 73,
+            "removed_page_number_lines": 0
+          },
+          "source_metrics": {
+            "characters": 109255,
+            "lines": 3262,
+            "headings": 246,
+            "table_rows": 106,
+            "very_long_lines": 0,
+            "max_line_length": 413
+          },
+          "output_metrics": {
+            "characters": 109126,
+            "lines": 1881,
+            "headings": 173,
+            "table_rows": 106,
+            "very_long_lines": 0,
+            "max_line_length": 768
+          }
+        },
+        {
+          "filename": "[2026년] 공익법인 세무안내(3).md",
+          "year": 2026,
+          "document_type": "tax_guide",
+          "source_sha256": "9a6501fab33a70dbed6bf5ab59711f6b8706a999f780e26ff9a0ddff03796392",
+          "output_sha256": "02426db33614016ae7728c504775f7012e767b4484e302f8ac26f2378ee24f0b",
+          "changes": {
+            "source_lines": 3747,
+            "output_lines": 3017,
+            "normalized_headings": 50,
+            "removed_page_number_lines": 0
+          },
+          "source_metrics": {
+            "characters": 123201,
+            "lines": 3747,
+            "headings": 218,
+            "table_rows": 1136,
+            "very_long_lines": 1,
+            "max_line_length": 1526
+          },
+          "output_metrics": {
+            "characters": 123095,
+            "lines": 3022,
+            "headings": 168,
+            "table_rows": 1136,
+            "very_long_lines": 1,
+            "max_line_length": 1526
+          }
+        }
+      ]
     },
     {
       "filename": "[2026년] 학교법인 및 사립대학 2026회계연도 예산 편성 및 관리 유의사항.md",
@@ -1656,5 +1799,8 @@
         "max_line_length": 548
       }
     }
-  ]
+  ],
+  "source_file_count": 57,
+  "logical_file_count": 49,
+  "merged_group_count": 4
 }
