@@ -1,4 +1,4 @@
-# Supabase Chunk + Neo4j Fact Graph 임베딩 V4 계획
+# 임베딩 V4 전체 구축 계획 — Supabase 검색과 Neo4j 지식 그래프
 
 **작성일:** 2026-08-20
 **상태:** 구현 전 확정 계획
